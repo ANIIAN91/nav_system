@@ -517,7 +517,7 @@ def is_path_protected(path: str, protected_paths: List[str]) -> bool:
 
 @app.get("/api/articles")
 async def list_articles(current_user: Optional[str] = Depends(get_current_user)):
-    """获取文章列表（根据登录状态过滤受保护目录）"""
+    """获取文章列表（根据登录状态过滤受保护目录，按创建时间排序）"""
     settings = load_settings()
     protected_paths = settings.get("protected_article_paths", [])
 
@@ -531,12 +531,24 @@ async def list_articles(current_user: Optional[str] = Depends(get_current_user))
             if current_user is None and is_path_protected(rel_path_str, protected_paths):
                 continue
 
+            # 获取文件创建时间（优先使用 ctime，如果不可用则使用 mtime）
+            stat = path.stat()
+            # 在 Linux 上 st_ctime 是元数据修改时间，st_mtime 是内容修改时间
+            # 在 Windows 上 st_ctime 是创建时间
+            # 这里使用 st_mtime 作为排序依据，因为它更可靠
+            created_time = stat.st_mtime
+
             articles.append({
                 "path": rel_path_str,
                 "title": path.stem,
                 "category": str(rel_path.parent) if rel_path.parent != Path(".") else None,
-                "protected": is_path_protected(rel_path_str, protected_paths)
+                "protected": is_path_protected(rel_path_str, protected_paths),
+                "created_time": created_time
             })
+
+    # 按创建时间降序排序（最新的在前）
+    articles.sort(key=lambda x: x["created_time"], reverse=True)
+
     return {"articles": articles}
 
 @app.get("/api/articles/{path:path}")

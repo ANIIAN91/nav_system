@@ -1,0 +1,10 @@
+{
+  "id": "nav-system-sync",
+  "name": "Nav System Sync",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Sync Obsidian notes to Nav System",
+  "author": "Nav System",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}

@@ -1,0 +1,418 @@
+{
+  "categories": [
+    {
+      "name": "Github",
+      "auth_required": false,
+      "links": [
+        {
+          "id": "29c8e627-e3a5-4177-a1a9-f5b0eb986644",
+          "title": "llm-council",
+          "url": "https://github.com/karpathy/llm-council/tree/master",
+          "icon": null
+        },
+        {
+          "id": "b887c6d9-32ba-41d6-8a21-3ea1b82e8551",
+          "title": "ai-by-hand-excel",
+          "url": "https://github.com/ImagineAILab/ai-by-hand-excel",
+          "icon": null
+        }
+      ]
+    },
+    {
+      "name": "Me",
+      "auth_required": true,
+      "links": [
+        {
+          "id": "d676a6c5-2671-48d4-b028-bfd476cf7547",
+          "title": "主页",
+          "url": "https://www.aniian.com/",
+          "icon": null
+        },
+        {
+          "id": "8a9f7807-ca0d-452c-81aa-f4c165001385",
+          "title": "n8n",
+          "url": "https://n8n.aniian.com/",
+          "icon": null
+        },
+        {
+          "id": "dd291054-6169-4a00-9842-3d2384effbc8",
+          "title": "Alist",
+          "url": "https://alist.aniian.com/",
+          "icon": null
+        },
+        {
+          "id": "97afbe41-f9af-42e7-9cb7-4d544354977c",
+          "title": "Monitor",
+          "url": "https://monitor.aniian.com/",
+          "icon": null
+        },
+        {
+          "id": "56d3c06f-edf0-4af0-acde-19c94deed1e2",
+          "title": "CodeCombat",
+          "url": "http://45.192.110.65:3000/play",
+          "icon": null
+        },
+        {
+          "id": "6fc353f7-8eb3-4f5b-a9aa-2f0eb7c90406",
+          "title": "CasaOS",
+          "url": "http://45.192.110.65/#/",
+          "icon": null
+        },
+        {
+          "id": "4fa96b95-9c89-4af5-9651-43399c68fd81",
+          "title": "Nginx Proxy Manager",
+          "url": "https://admin.aniian.com/nginx/proxy",
+          "icon": null
+        },
+        {
+          "id": "c8d695b9-a46c-4a78-8d63-2fba39796e1e",
+          "title": "飞牛OS",
+          "url": "http://nas.aniian.com:8880/login",
+          "icon": null
+        },
+        {
+          "id": "b462a0c5-894d-4dcf-aac7-66d244737c9c",
+          "title": "cups",
+          "url": "http://nas.aniian.com:631/",
+          "icon": null
+        },
+        {
+          "id": "97f29c18-6e3d-4b9a-b132-f41400e201af",
+          "title": "minio",
+          "url": "http://nas.aniian.com:9001/login",
+          "icon": null
+        },
+        {
+          "id": "ec2ca891-af03-418a-8e6a-f4271da68feb",
+          "title": "Gotify",
+          "url": "https://push.aniian.com/",
+          "icon": null
+        },
+        {
+          "id": "cb8fc358-c1a3-40a8-ace7-497944ed37aa",
+          "title": "cc switch",
+          "url": "https://switch.aniian.com",
+          "icon": null
+        }
+      ]
+    },
+    {
+      "name": "Ai",
+      "auth_required": false,
+      "links": [
+        {
+          "id": "f4d55197-6e22-4238-b535-341ffda1682e",
+          "title": "黑与白",
+          "url": "https://ai.hybgzs.com/login",
+          "icon": null
+        },
+        {
+          "id": "cdd67acc-705f-4ac9-bd08-bff91bfa596b",
+          "title": "黑与白-抽额度",
+          "url": "https://cdk.hybgzs.com/",
+          "icon": null
+        },
+        {
+          "id": "39622e51-b0ac-44ca-a8db-e99f5ed771f2",
+          "title": "B4U",
+          "url": "https://b4u.qzz.io/",
+          "icon": null
+        },
+        {
+          "id": "4f6dc5cf-a204-410d-8d83-3053272b6eab",
+          "title": "B4U-抽额度",
+          "url": "https://tw.b4u.qzz.io/dashboard",
+          "icon": null
+        },
+        {
+          "id": "6551774b-d386-4236-a935-27faeaa4a8a3",
+          "title": "WONG公益站",
+          "url": "https://newapi.netlib.re/console",
+          "icon": null
+        },
+        {
+          "id": "a5161135-0fa5-4349-a2f0-d5d9722c2860",
+          "title": "我爱996",
+          "url": "https://529961.com/",
+          "icon": null
+        },
+        {
+          "id": "ffe9402c-3a5b-4148-a181-b9ba8900954d",
+          "title": "KYX API",
+          "url": "https://api.kkyyxx.xyz/console/token",
+          "icon": null
+        },
+        {
+          "id": "11ab0350-d683-4316-b032-03fb7399cc09",
+          "title": "PrismAI",
+          "url": "https://ai.prism.uno/console/token",
+          "icon": null
+        },
+        {
+          "id": "0efe1088-274c-469a-b462-480500d70e8d",
+          "title": "DEV88公益",
+          "url": "https://api.dev88.tech/",
+          "icon": null
+        },
+        {
+          "id": "9045b612-ded8-4df7-bf98-ab901175c8a2",
+          "title": "Huan API",
+          "url": "https://ai.huan666.de/login",
+          "icon": null
+        },
+        {
+          "id": "cac60305-06ab-494a-bb9a-cce679c5a4a4",
+          "title": "sdwfger",
+          "url": "https://sdwfger.edu.kg/console/token",
+          "icon": null
+        },
+        {
+          "id": "a891dd44-9013-4e8d-9439-b0ed736c67f5",
+          "title": "fakeopen",
+          "url": "https://fakeopen.codelib.re/pricing",
+          "icon": null
+        },
+        {
+          "id": "8dd7f0c8-46e4-400f-b2f3-a372a8d6996d",
+          "title": "随时跑路公益",
+          "url": "https://runanytime.hxi.me/login",
+          "icon": null
+        },
+        {
+          "id": "c7260a46-d886-4285-a7db-d5ab34ad852f",
+          "title": "Right Code",
+          "url": "https://www.right.codes/login",
+          "icon": null
+        },
+        {
+          "id": "8fea4734-194a-4fbf-ba9b-73d24a406948",
+          "title": "Yes Code",
+          "url": "https://cotest.yes.vg/dashboard",
+          "icon": null
+        },
+        {
+          "id": "f3666e4f-bc3b-4992-9ef4-ccfafbe64a39",
+          "title": "Perplexity",
+          "url": "https://www.perplexity.ai/",
+          "icon": null
+        },
+        {
+          "id": "b6829573-d4db-4fd0-af7c-40ab50748926",
+          "title": "Deepseek",
+          "url": "https://www.deepseek.com/",
+          "icon": null
+        },
+        {
+          "id": "6db9af2c-bb8c-45e0-b859-fc65908a26ef",
+          "title": "秘塔AI",
+          "url": "https://metaso.cn/",
+          "icon": null
+        },
+        {
+          "id": "20008682-b7cb-497d-9a00-eb0fe2787776",
+          "title": "AutoDL",
+          "url": "https://www.autodl.com/login?url=/",
+          "icon": null
+        },
+        {
+          "id": "9d1611aa-4864-4f44-beac-c6b98b6ac31d",
+          "title": "Google AI Studio",
+          "url": "https://aistudio.google.com/app/prompts/new_chat",
+          "icon": null
+        },
+        {
+          "id": "07538e97-56fe-43c4-a09c-5504f663272e",
+          "title": "manus",
+          "url": "https://manus.im/app",
+          "icon": null
+        },
+        {
+          "id": "81fdcc5a-9471-471a-8051-1201e50f3408",
+          "title": "红石",
+          "url": "https://api.hongshi.ggff.net/",
+          "icon": null
+        },
+        {
+          "id": "aeb7e06f-f1c9-4711-a4bb-4292a6b8aeae",
+          "title": "红石-HF",
+          "url": "https://hongshi1024-l-api.hf.space/app/dashboard",
+          "icon": null
+        },
+        {
+          "id": "6a4528b0-ad4a-4637-9b40-07d6e4550cc7",
+          "title": "Colin",
+          "url": "https://api.colin1112.me/console/topup",
+          "icon": null
+        },
+        {
+          "id": "4b84324a-1a4c-4458-b16f-5f6ee35b911e",
+          "title": "罗斯理大学",
+          "url": "https://mail.rose.edu.kg/inbox",
+          "icon": null
+        },
+        {
+          "id": "005860f2-143c-4f44-9dbd-041b44099df4",
+          "title": "db的AIGC站",
+          "url": "https://ai.feles.town/chat",
+          "icon": null
+        }
+      ]
+    },
+    {
+      "name": "APP",
+      "auth_required": false,
+      "links": [
+        {
+          "id": "81884900-7981-4157-aebc-c7df050d9a11",
+          "title": "Linux.do",
+          "url": "https://linux.do/",
+          "icon": null
+        },
+        {
+          "id": "879ce95e-d106-4905-ac14-add892c53e69",
+          "title": "Duckduckgo AI",
+          "url": "https://duckduckgo.com/?q=DuckDuckGo+AI+Chat&ia=chat&duckai=1",
+          "icon": null
+        },
+        {
+          "id": "e36a30d2-a7b6-4f9a-8b81-cf3ba3747ce7",
+          "title": "cloudaistudio",
+          "url": "https://ide.cloud.tencent.com/dashboard/gpu-workspace",
+          "icon": null
+        },
+        {
+          "id": "cce443b5-d66b-484a-87ec-744a0676c142",
+          "title": "v2ex",
+          "url": "https://www.v2ex.com/",
+          "icon": null
+        },
+        {
+          "id": "6ae1bf74-fef5-4abb-b482-405316d4ef3c",
+          "title": "youtube",
+          "url": "https://youtube.com/",
+          "icon": null
+        },
+        {
+          "id": "4ccf623d-a8e9-4b1b-9942-6f440920df2e",
+          "title": "GitHub",
+          "url": "https://github.com/",
+          "icon": null
+        },
+        {
+          "id": "50e19b5d-cda7-4959-be67-0454a56c95d1",
+          "title": "google voice",
+          "url": "https://voice.google.com/u/0/",
+          "icon": null
+        },
+        {
+          "id": "2cb06f32-a616-4548-9544-431e64a25327",
+          "title": "Telegram",
+          "url": "https://web.telegram.org/",
+          "icon": null
+        },
+        {
+          "id": "617a9f60-2917-45d8-9e8d-0e9888608281",
+          "title": "office tools",
+          "url": "https://otp.landian.vip/zh-cn/",
+          "icon": null
+        },
+        {
+          "id": "c6803364-7b0b-4afd-bcb2-7316792c64dc",
+          "title": "转换工具",
+          "url": "https://www.wdku.net/",
+          "icon": null
+        },
+        {
+          "id": "7ffa56a4-3c76-4f1d-a66f-c99ed381cba0",
+          "title": "kms",
+          "url": "https://kms.cangshui.net/",
+          "icon": null
+        },
+        {
+          "id": "00e40bf1-bb0f-4aee-8a4a-e0620370c0ea",
+          "title": "kms",
+          "url": "https://www.moerats.com/kms/",
+          "icon": null
+        },
+        {
+          "id": "776f69ca-50b3-4c55-94f0-e729172c907e",
+          "title": "鸠摩搜书",
+          "url": "https://www.jiumodiary.com/",
+          "icon": null
+        },
+        {
+          "id": "6e80d61a-3489-42e4-829d-986e3bf53515",
+          "title": "6 Minute English",
+          "url": "https://www.youtube.com/watch?v=DJSvLo9dA9U&list=PLcetZ6gSk96-FECmH9l7Vlx5VDigvgZpt)",
+          "icon": null
+        },
+        {
+          "id": "55f0b359-625e-4ba9-84fa-799658555238",
+          "title": "Type Words",
+          "url": "https://2study.top/practice-articles/article_nce1",
+          "icon": null
+        },
+        {
+          "id": "97fcd5fc-8ba0-4f58-87be-4a93542e4ce5",
+          "title": "网易邮箱",
+          "url": "https://mailh.qiye.163.com/",
+          "icon": null
+        },
+        {
+          "id": "f91d30a8-1f92-4c25-afc9-dc5e481f0e43",
+          "title": "道德经",
+          "url": "https://www.daodejing.org/",
+          "icon": null
+        },
+        {
+          "id": "e5a5e1a4-f5e1-4b5c-97ac-f5f483835f35",
+          "title": "cloudflare",
+          "url": "https://www.cloudflare-cn.com/enterprise/",
+          "icon": null
+        },
+        {
+          "id": "59defbc5-e165-4f56-9300-24e69e789683",
+          "title": "QQMail",
+          "url": "https://wx.mail.qq.com/",
+          "icon": null
+        },
+        {
+          "id": "79e03bbd-0aca-48ab-890b-1351be19fec2",
+          "title": "webshare",
+          "url": "https://www.webshare.io/",
+          "icon": null
+        },
+        {
+          "id": "17fda940-73fe-4abd-8995-d54ed189e3a8",
+          "title": "花瓣邮箱",
+          "url": "https://www.petalmail.com/",
+          "icon": null
+        },
+        {
+          "id": "1225de16-0f26-4e16-a049-48f50419ed02",
+          "title": "抖音",
+          "url": "https://www.douyin.com/",
+          "icon": null
+        },
+        {
+          "id": "eb992b60-e148-4df5-8694-88115c7478a5",
+          "title": "头条",
+          "url": "https://mp.toutiao.com/profile_v4/manage/content/all",
+          "icon": null
+        },
+        {
+          "id": "26deccc6-1bdc-4ee1-897a-5792f74b733f",
+          "title": "知乎",
+          "url": "https://www.zhihu.com/creator/manage/creation/all",
+          "icon": null
+        },
+        {
+          "id": "a628bccb-caa5-4b22-9240-ed341e1a821c",
+          "title": "创作服务平台",
+          "url": "https://creator.xiaohongshu.com/new/home",
+          "icon": null
+        }
+      ]
+    }
+  ]
+}

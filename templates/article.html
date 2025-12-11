@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文章 - 个人主页</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <a href="/" class="back-link">返回主页</a>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <h1 class="page-title" id="page-title">文章</h1>
+                <button id="theme-toggle" class="theme-toggle" title="切换主题">&#9790;</button>
+            </div>
+        </header>
+
+        <!-- 主内容区 -->
+        <main class="main-content article-page">
+            <!-- 文章列表 -->
+            <aside id="article-list" class="article-sidebar">
+                <h3>文章目录</h3>
+                <div id="articles-tree"></div>
+            </aside>
+
+            <!-- 文章内容 -->
+            <article id="article-content" class="article-content">
+                <div id="article-body">
+                    <p class="placeholder">请从左侧选择文章</p>
+                </div>
+            </article>
+        </main>
+
+        <!-- 底部 -->
+        <footer class="footer">
+            <div id="footer-content">
+                <span id="icp-info"></span>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // 检查登录状态（token 可能在 localStorage 或 sessionStorage 中）
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+
+        // 主题切换
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateThemeIcon(savedTheme);
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon(newTheme);
+        }
+
+        function updateThemeIcon(theme) {
+            const btn = document.getElementById('theme-toggle');
+            if (btn) {
+                btn.innerHTML = theme === 'light' ? '&#9728;' : '&#9790;';
+            }
+        }
+
+        // 加载站点设置
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/settings');
+                const settings = await response.json();
+
+                // 更新页面标题
+                const titleEl = document.getElementById('page-title');
+                if (titleEl && settings.article_page_title) {
+                    titleEl.textContent = settings.article_page_title;
+                    document.title = settings.article_page_title + ' - 个人主页';
+                }
+
+                // 更新备案信息显示
+                const icpEl = document.getElementById('icp-info');
+                if (icpEl) {
+                    let footerText = '';
+                    if (settings.copyright) footerText += settings.copyright;
+                    if (settings.icp) footerText += (footerText ? ' | ' : '') + settings.icp;
+                    icpEl.textContent = footerText || '';
+                }
+
+                return settings;
+            } catch (error) {
+                console.error('加载设置失败:', error);
+                return {};
+            }
+        }
+
+        // 获取文章列表
+        async function loadArticles() {
+            try {
+                const headers = {};
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+                const response = await fetch('/api/articles', { headers });
+                const data = await response.json();
+                renderArticleTree(data.articles);
+            } catch (error) {
+                console.error('加载文章列表失败:', error);
+            }
+        }
+
+        // 渲染文章树（带折叠功能）
+        function renderArticleTree(articles) {
+            const tree = document.getElementById('articles-tree');
+            const categories = {};
+
+            // 按分类分组
+            articles.forEach(article => {
+                const cat = article.category || '未分类';
+                if (!categories[cat]) {
+                    categories[cat] = [];
+                }
+                categories[cat].push(article);
+            });
+
+            // 获取保存的折叠状态
+            const collapsedState = JSON.parse(localStorage.getItem('articleCollapsed') || '{}');
+
+            // 渲染
+            let html = '';
+            for (const [category, items] of Object.entries(categories)) {
+                const isCollapsed = collapsedState[category] === true;
+                html += `<div class="article-category ${isCollapsed ? 'collapsed' : ''}" data-category="${category}">
+                    <div class="article-category-header">
+                        <h4><span class="collapse-icon">&#9660;</span> ${category}</h4>
+                    </div>
+                    <ul>`;
+                items.forEach(item => {
+                    html += `<li><a href="#" data-path="${item.path}">${item.title}</a></li>`;
+                });
+                html += `</ul></div>`;
+            }
+
+            if (html === '') {
+                html = '<p class="no-articles">暂无文章</p>';
+            }
+
+            tree.innerHTML = html;
+
+            // 绑定折叠事件
+            tree.querySelectorAll('.article-category-header').forEach(header => {
+                header.addEventListener('click', () => {
+                    const category = header.closest('.article-category');
+                    category.classList.toggle('collapsed');
+
+                    // 保存折叠状态
+                    const categoryName = category.dataset.category;
+                    const collapsedState = JSON.parse(localStorage.getItem('articleCollapsed') || '{}');
+                    collapsedState[categoryName] = category.classList.contains('collapsed');
+                    localStorage.setItem('articleCollapsed', JSON.stringify(collapsedState));
+                });
+            });
+
+            // 绑定点击事件
+            tree.querySelectorAll('a[data-path]').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    loadArticle(link.dataset.path);
+                    // 更新选中状态
+                    tree.querySelectorAll('a').forEach(a => a.classList.remove('active'));
+                    link.classList.add('active');
+                });
+            });
+        }
+
+        // 加载文章内容
+        async function loadArticle(path) {
+            try {
+                const headers = {};
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+                const response = await fetch(`/api/articles/${path}`, { headers });
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || '文章不存在');
+                }
+                const data = await response.json();
+                document.getElementById('article-body').innerHTML = data.html;
+            } catch (error) {
+                document.getElementById('article-body').innerHTML = `<p class="error">加载失败: ${error.message}</p>`;
+            }
+        }
+
+        // 检查 URL 中是否有文章路径
+        function checkUrlPath() {
+            const path = window.location.pathname.replace('/articles/', '').replace('/articles', '');
+            if (path && path !== '/') {
+                loadArticle(path);
+            }
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            loadSettings();
+            loadArticles();
+            checkUrlPath();
+
+            document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
+        });
+    </script>
+</body>
+</html>

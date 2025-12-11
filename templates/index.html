@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人主页导航</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <div class="clock" id="clock"></div>
+            <div class="user-area">
+                <button id="theme-toggle" class="theme-toggle" title="切换主题">&#9790;</button>
+                <span id="username-display" style="display: none;"></span>
+                <button id="login-btn" class="btn btn-primary">登录</button>
+                <button id="logout-btn" class="btn btn-secondary" style="display: none;">登出</button>
+                <button id="manage-btn" class="btn btn-secondary" style="display: none;">管理</button>
+                <a href="/articles" id="articles-btn" class="btn btn-secondary">文章</a>
+            </div>
+        </header>
+
+        <!-- 导航内容 -->
+        <main class="main-content">
+            <div id="links-container" class="links-container"></div>
+        </main>
+
+        <!-- 底部 -->
+        <footer class="footer">
+            <div id="footer-content">
+                <span id="icp-info"></span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 登录弹窗 -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>登录</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="username">用户名</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">密码</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <div class="form-group checkbox-group">
+                    <label>
+                        <input type="checkbox" id="remember-credentials" name="remember_credentials">
+                        记住账号密码
+                    </label>
+                </div>
+                <div class="form-group checkbox-group">
+                    <label>
+                        <input type="checkbox" id="stay-logged-in" name="stay_logged_in">
+                        保持登录状态
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary">登录</button>
+                <p id="login-error" class="error"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- 管理弹窗 -->
+    <div id="manage-modal" class="modal">
+        <div class="modal-content modal-large">
+            <span class="close">&times;</span>
+            <h2>链接管理</h2>
+            <div class="manage-tabs">
+                <button class="tab-btn active" data-tab="add-link">添加链接</button>
+                <button class="tab-btn" data-tab="add-category">添加分类</button>
+                <button class="tab-btn" data-tab="site-settings">站点设置</button>
+                <button class="tab-btn" data-tab="import-export">导入导出</button>
+            </div>
+            <div id="add-link" class="tab-content active">
+                <form id="add-link-form">
+                    <div class="form-group">
+                        <label for="link-category">分类</label>
+                        <select id="link-category" name="category" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="link-title">标题</label>
+                        <input type="text" id="link-title" name="title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="link-url">URL</label>
+                        <input type="url" id="link-url" name="url" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="link-icon">图标文件名（可选）</label>
+                        <input type="text" id="link-icon" name="icon" placeholder="例如: icon.png">
+                        <button type="button" id="fetch-icon-btn" class="btn btn-secondary" style="margin-top: 8px;">自动获取图标</button>
+                        <small id="fetch-icon-status" style="display: block; margin-top: 5px; color: var(--text-muted);"></small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">添加</button>
+                </form>
+            </div>
+            <div id="add-category" class="tab-content">
+                <form id="add-category-form">
+                    <div class="form-group">
+                        <label for="category-name">分类名称</label>
+                        <input type="text" id="category-name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="category-auth" name="auth_required">
+                            需要登录才可见
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-primary">添加</button>
+                </form>
+            </div>
+            <div id="site-settings" class="tab-content">
+                <form id="edit-footer-form">
+                    <div class="form-group">
+                        <label for="site-title">网站标题</label>
+                        <input type="text" id="site-title" name="site_title" placeholder="例如: 个人主页导航">
+                    </div>
+                    <div class="form-group">
+                        <label for="footer-article-title">文章页标题</label>
+                        <input type="text" id="footer-article-title" name="article_page_title" placeholder="例如: 文章、博客、笔记">
+                    </div>
+                    <div class="form-group">
+                        <label for="link-size">链接大小</label>
+                        <select id="link-size" name="link_size">
+                            <option value="small">小</option>
+                            <option value="medium">中</option>
+                            <option value="large">大</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="protected-paths">受保护的文章目录（需登录查看）</label>
+                        <input type="text" id="protected-paths" name="protected_article_paths" placeholder="多个目录用逗号分隔，如: private,notes/secret">
+                        <small style="color: var(--text-muted);">输入目录名，该目录下的文章需要登录后才能查看</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="footer-icp">备案号</label>
+                        <input type="text" id="footer-icp" name="icp" placeholder="例如: 京ICP备XXXXXXXX号">
+                    </div>
+                    <div class="form-group">
+                        <label for="footer-copyright">版权信息</label>
+                        <input type="text" id="footer-copyright" name="copyright" placeholder="例如: © 2024 Your Name">
+                    </div>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </form>
+            </div>
+            <div id="import-export" class="tab-content">
+                <div class="form-group">
+                    <label>导出</label>
+                    <button type="button" id="export-links-btn" class="btn btn-secondary">导出导航数据</button>
+                </div>
+                <hr style="margin: 20px 0; border-color: var(--border-color);">
+                <div class="form-group">
+                    <label for="import-file">导入</label>
+                    <input type="file" id="import-file" accept=".json" style="margin-bottom: 8px;">
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" id="import-native-btn" class="btn btn-secondary">导入(原生格式)</button>
+                        <button type="button" id="import-sunpanel-btn" class="btn btn-secondary">导入(SunPanel)</button>
+                    </div>
+                    <small id="import-status" style="display: block; margin-top: 5px; color: var(--text-muted);"></small>
+                </div>
+                <hr style="margin: 20px 0; border-color: var(--border-color);">
+                <div class="form-group">
+                    <label>API Token（用于 Obsidian 插件或脚本同步）</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="text" id="jwt-token-display" readonly style="flex: 1; font-family: monospace; font-size: 12px;">
+                        <button type="button" id="copy-token-btn" class="btn btn-secondary">复制</button>
+                    </div>
+                    <small style="color: var(--text-muted);">此 Token 用于 Obsidian 插件或 Python 脚本同步文章</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑链接弹窗 -->
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>编辑链接</h2>
+            <form id="edit-link-form">
+                <input type="hidden" id="edit-link-id">
+                <div class="form-group">
+                    <label for="edit-link-title">标题</label>
+                    <input type="text" id="edit-link-title" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-link-url">URL</label>
+                    <input type="url" id="edit-link-url" name="url" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-link-icon">图标文件名</label>
+                    <input type="text" id="edit-link-icon" name="icon">
+                    <button type="button" id="edit-fetch-icon-btn" class="btn btn-secondary" style="margin-top: 8px;">自动获取图标</button>
+                    <small id="edit-fetch-icon-status" style="display: block; margin-top: 5px; color: var(--text-muted);"></small>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">保存</button>
+                    <button type="button" id="delete-link-btn" class="btn btn-danger">删除</button>
+                </div>
+                <div class="form-group" style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                    <label>调整顺序</label>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" id="link-move-up-btn" class="btn btn-secondary">上移</button>
+                        <button type="button" id="link-move-down-btn" class="btn btn-secondary">下移</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 编辑分类弹窗 -->
+    <div id="edit-category-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>编辑分类</h2>
+            <form id="edit-category-form">
+                <input type="hidden" id="edit-category-old-name">
+                <div class="form-group">
+                    <label for="edit-category-name">分类名称</label>
+                    <input type="text" id="edit-category-name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="edit-category-auth" name="auth_required">
+                        需要登录才可见
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">保存</button>
+                    <button type="button" id="delete-category-modal-btn" class="btn btn-danger">删除分类</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

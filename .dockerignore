@@ -1,0 +1,26 @@
+__pycache__
+*.pyc
+*.pyo
+.git
+.gitignore
+.env
+.env.example
+*.md
+!README.md
+.DS_Store
+
+# 数据目录（通过 volume 挂载）
+data/
+articles/
+static/icons/
+
+# 开发和部署脚本
+*.log
+*.tmp
+init.sh
+migrate.sh
+build.sh
+docker-compose.hub.yml
+
+# 导出文件
+*.tar.gz

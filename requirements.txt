@@ -1,0 +1,11 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-jose[cryptography]==3.3.0
+passlib==1.7.4
+bcrypt==4.0.1
+python-multipart==0.0.6
+httpx==0.25.2
+markdown==3.5.1
+Pygments==2.17.2
+Jinja2==3.1.2
+PyYAML==6.0.1

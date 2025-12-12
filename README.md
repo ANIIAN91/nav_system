@@ -63,17 +63,6 @@
 - **更新记录**：记录链接、分类、文章、目录的增删改操作（最多保留 500 条）
 - 支持查看和清空记录
 
-
-## 展示
-![alt text](static/readme/image-1.png) 
-![alt text](static/readme/image-2.png) 
-![alt text](static/readme/image-3.png) 
-![alt text](static/readme/image-4.png) 
-![alt text](static/readme/image-5.png) 
-![alt text](static/readme/image-6.png) 
-![alt text](static/readme/image.png)
-
-
 # 部署指南
 <video width="100%" controls>
   <source src="./static/readme/20251212_144646.mp4" type="video/mp4">

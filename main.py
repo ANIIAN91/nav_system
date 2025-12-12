@@ -126,6 +126,7 @@ class SiteSettings(BaseModel):
     site_title: Optional[str] = "个人主页导航"
     link_size: Optional[str] = "medium"  # small, medium, large
     protected_article_paths: Optional[List[str]] = []  # 需要登录才能查看的文章目录
+    analytics_code: Optional[str] = ""  # 统计分析代码（如百度统计、Google Analytics）
 
 class ArticleSyncRequest(BaseModel):
     path: str  # 文章保存路径，如 "notes/my-article.md"
@@ -1027,7 +1028,8 @@ async def index(request: Request):
     client_ip = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "")
     record_visit(client_ip, "/", user_agent)
-    return templates.TemplateResponse("index.html", {"request": request})
+    settings = load_settings()
+    return templates.TemplateResponse("index.html", {"request": request, "settings": settings})
 
 @app.get("/articles", response_class=HTMLResponse)
 async def articles_page(request: Request):
@@ -1036,7 +1038,8 @@ async def articles_page(request: Request):
     client_ip = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "")
     record_visit(client_ip, "/articles", user_agent)
-    return templates.TemplateResponse("article.html", {"request": request})
+    settings = load_settings()
+    return templates.TemplateResponse("article.html", {"request": request, "settings": settings})
 
 @app.get("/articles/{path:path}", response_class=HTMLResponse)
 async def article_page(request: Request, path: str):
@@ -1045,7 +1048,8 @@ async def article_page(request: Request, path: str):
     client_ip = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "")
     record_visit(client_ip, f"/articles/{path}", user_agent)
-    return templates.TemplateResponse("article.html", {"request": request, "path": path})
+    settings = load_settings()
+    return templates.TemplateResponse("article.html", {"request": request, "path": path, "settings": settings})
 
 if __name__ == "__main__":
     import uvicorn

@@ -621,7 +621,7 @@ async function loadSettings() {
 }
 
 // 保存站点设置
-async function saveSettings(icp, copyright, articlePageTitle, siteTitle, linkSize, protectedPaths) {
+async function saveSettings(icp, copyright, articlePageTitle, siteTitle, linkSize, protectedPaths, analyticsCode) {
     try {
         const response = await api('/api/settings', {
             method: 'PUT',
@@ -631,7 +631,8 @@ async function saveSettings(icp, copyright, articlePageTitle, siteTitle, linkSiz
                 article_page_title: articlePageTitle,
                 site_title: siteTitle,
                 link_size: linkSize,
-                protected_article_paths: protectedPaths
+                protected_article_paths: protectedPaths,
+                analytics_code: analyticsCode
             })
         });
 
@@ -673,6 +674,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const copyrightInput = document.getElementById('footer-copyright');
         const linkSizeSelect = document.getElementById('link-size');
         const protectedPathsInput = document.getElementById('protected-paths');
+        const analyticsCodeInput = document.getElementById('analytics-code');
         const jwtTokenDisplay = document.getElementById('jwt-token-display');
         if (siteTitleInput) siteTitleInput.value = settings.site_title || '个人主页导航';
         if (articleTitleInput) articleTitleInput.value = settings.article_page_title || '文章';
@@ -680,6 +682,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (copyrightInput) copyrightInput.value = settings.copyright || '';
         if (linkSizeSelect) linkSizeSelect.value = settings.link_size || 'medium';
         if (protectedPathsInput) protectedPathsInput.value = (settings.protected_article_paths || []).join(',');
+        if (analyticsCodeInput) analyticsCodeInput.value = settings.analytics_code || '';
         if (jwtTokenDisplay) jwtTokenDisplay.value = state.token || '';
         openModal('manage-modal');
     });
@@ -823,7 +826,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const linkSize = document.getElementById('link-size').value || 'medium';
         const protectedPathsStr = document.getElementById('protected-paths').value || '';
         const protectedPaths = protectedPathsStr.split(',').map(p => p.trim()).filter(p => p);
-        saveSettings(icp, copyright, articleTitle, siteTitle, linkSize, protectedPaths);
+        const analyticsCode = document.getElementById('analytics-code').value || '';
+        saveSettings(icp, copyright, articleTitle, siteTitle, linkSize, protectedPaths, analyticsCode);
     });
 
     // 导出导航数据

@@ -1,7 +1,7 @@
-# 个人主页及导航
+# 个人主页及导航 [demo](https://navsystem-navsystem.up.railway.app/)
+
 
 一个基于 Markdown 的个人主页系统，集成导航站和文章展示功能。
-
 ## 功能特性
 
 > **安全提示：** 本项目不再提供默认账号密码，部署时必须通过环境变量配置。详见 [安全配置](#安全配置) 章节。
@@ -72,6 +72,19 @@
 ![alt text](static/readme/image-5.png) 
 ![alt text](static/readme/image-6.png) 
 ![alt text](static/readme/image.png)
+
+
+# 部署指南
+<video width="100%" controls>
+  <source src="./static/readme/20251212_144646.mp4" type="video/mp4">
+  您的浏览器不支持 Video 标签。
+</video>
+
+
+本项目托管在 Railway 平台，支持一键部署：
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/MxkRwo?referralCode=TEG7-_&utm_medium=integration&utm_source=template&utm_campaign=generic)
+
+
 
 ## 技术栈
 

@@ -143,6 +143,77 @@ def load_settings() -> dict:
             return json.load(f)
     return {"icp": "", "copyright": "", "article_page_title": "文章"}
 
+# IP访问记录相关
+VISIT_LOG_FILE = DATA_DIR / "visit_log.json"
+MAX_VISIT_RECORDS = 1000  # 最多保留的记录数
+
+def load_visit_log() -> list:
+    """加载访问记录"""
+    if VISIT_LOG_FILE.exists():
+        with open(VISIT_LOG_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+def save_visit_log(records: list):
+    """保存访问记录"""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(VISIT_LOG_FILE, "w", encoding="utf-8") as f:
+        json.dump(records, f, ensure_ascii=False, indent=2)
+
+def record_visit(ip: str, path: str, user_agent: str = ""):
+    """记录一次访问"""
+    records = load_visit_log()
+    record = {
+        "ip": ip,
+        "path": path,
+        "user_agent": user_agent,
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    records.insert(0, record)  # 新记录插入到开头
+    # 限制记录数量
+    if len(records) > MAX_VISIT_RECORDS:
+        records = records[:MAX_VISIT_RECORDS]
+    save_visit_log(records)
+
+# 操作更新记录相关
+UPDATE_LOG_FILE = DATA_DIR / "update_log.json"
+MAX_UPDATE_RECORDS = 500  # 最多保留的记录数
+
+def load_update_log() -> list:
+    """加载更新记录"""
+    if UPDATE_LOG_FILE.exists():
+        with open(UPDATE_LOG_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+def save_update_log(records: list):
+    """保存更新记录"""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(UPDATE_LOG_FILE, "w", encoding="utf-8") as f:
+        json.dump(records, f, ensure_ascii=False, indent=2)
+
+def record_update(action: str, target_type: str, target_name: str, details: str = "", username: str = ""):
+    """记录一次更新操作
+    action: 操作类型 (add, update, delete, move)
+    target_type: 目标类型 (link, category, article, folder, settings)
+    target_name: 目标名称
+    details: 详细信息
+    username: 操作用户
+    """
+    records = load_update_log()
+    record = {
+        "action": action,
+        "target_type": target_type,
+        "target_name": target_name,
+        "details": details,
+        "username": username,
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    records.insert(0, record)
+    if len(records) > MAX_UPDATE_RECORDS:
+        records = records[:MAX_UPDATE_RECORDS]
+    save_update_log(records)
+
 def save_settings(data: dict):
     """保存站点设置"""
     settings_file = DATA_DIR / "settings.json"
@@ -299,28 +370,76 @@ async def add_link(category_name: str, link: LinkItem, username: str = Depends(r
         if cat["name"] == category_name:
             cat["links"].append(link.dict())
             save_links(data)
+            record_update("add", "link", link.title, f"分类: {category_name}, URL: {link.url}", username)
             return {"message": "添加成功", "link": link}
 
     # 分类不存在，创建新分类
     new_category = {"name": category_name, "auth_required": False, "links": [link.dict()]}
     data.setdefault("categories", []).append(new_category)
     save_links(data)
+    record_update("add", "link", link.title, f"新建分类: {category_name}, URL: {link.url}", username)
     return {"message": "添加成功", "link": link}
 
+class LinkUpdateRequest(BaseModel):
+    title: str
+    url: str
+    icon: Optional[str] = None
+    category: Optional[str] = None  # 新分类名称，如果提供则移动链接
+
 @app.put("/api/links/{link_id}")
-async def update_link(link_id: str, link: LinkItem, username: str = Depends(require_auth)):
-    """修改导航链接"""
+async def update_link(link_id: str, link: LinkUpdateRequest, username: str = Depends(require_auth)):
+    """修改导航链接（支持修改分类）"""
     data = load_links()
 
+    # 查找链接所在的分类和位置
+    source_cat = None
+    source_idx = None
     for cat in data.get("categories", []):
         for i, l in enumerate(cat.get("links", [])):
             if l.get("id") == link_id:
-                link.id = link_id
-                cat["links"][i] = link.dict()
-                save_links(data)
-                return {"message": "修改成功", "link": link}
+                source_cat = cat
+                source_idx = i
+                break
+        if source_cat:
+            break
 
-    raise HTTPException(status_code=404, detail="链接不存在")
+    if source_cat is None:
+        raise HTTPException(status_code=404, detail="链接不存在")
+
+    # 构建更新后的链接数据
+    updated_link = {
+        "id": link_id,
+        "title": link.title,
+        "url": link.url,
+        "icon": link.icon
+    }
+
+    # 如果指定了新分类且与当前分类不同，则移动链接
+    if link.category and link.category != source_cat["name"]:
+        # 查找目标分类
+        target_cat = None
+        for cat in data.get("categories", []):
+            if cat["name"] == link.category:
+                target_cat = cat
+                break
+
+        if target_cat is None:
+            raise HTTPException(status_code=404, detail="目标分类不存在")
+
+        # 从源分类移除
+        del source_cat["links"][source_idx]
+        # 添加到目标分类
+        target_cat["links"].append(updated_link)
+    else:
+        # 原地更新
+        source_cat["links"][source_idx] = updated_link
+
+    save_links(data)
+    if link.category and link.category != source_cat["name"]:
+        record_update("move", "link", link.title, f"从 {source_cat['name']} 移动到 {link.category}", username)
+    else:
+        record_update("update", "link", link.title, f"URL: {link.url}", username)
+    return {"message": "修改成功", "link": updated_link}
 
 @app.delete("/api/links/{link_id}")
 async def delete_link(link_id: str, username: str = Depends(require_auth)):
@@ -330,8 +449,10 @@ async def delete_link(link_id: str, username: str = Depends(require_auth)):
     for cat in data.get("categories", []):
         for i, l in enumerate(cat.get("links", [])):
             if l.get("id") == link_id:
+                link_title = l.get("title", "未知")
                 del cat["links"][i]
                 save_links(data)
+                record_update("delete", "link", link_title, f"分类: {cat['name']}", username)
                 return {"message": "删除成功"}
 
     raise HTTPException(status_code=404, detail="链接不存在")
@@ -346,6 +467,7 @@ async def add_category(category: CategoryItem, username: str = Depends(require_a
 
     data.setdefault("categories", []).append(category.dict())
     save_links(data)
+    record_update("add", "category", category.name, f"私密: {'是' if category.auth_required else '否'}", username)
     return {"message": "添加成功", "category": category}
 
 @app.put("/api/categories/{category_name}")
@@ -364,6 +486,8 @@ async def update_category(category_name: str, category: CategoryItem, username: 
             cat["name"] = category.name
             cat["auth_required"] = category.auth_required
             save_links(data)
+            details = f"重命名为: {category.name}" if category.name != category_name else f"私密: {'是' if category.auth_required else '否'}"
+            record_update("update", "category", category_name, details, username)
             return {"message": "更新成功", "category": category}
 
     raise HTTPException(status_code=404, detail="分类不存在")
@@ -374,8 +498,10 @@ async def delete_category(category_name: str, username: str = Depends(require_au
     data = load_links()
     for i, cat in enumerate(data.get("categories", [])):
         if cat["name"] == category_name:
+            link_count = len(cat.get("links", []))
             del data["categories"][i]
             save_links(data)
+            record_update("delete", "category", category_name, f"包含 {link_count} 个链接", username)
             return {"message": "删除成功"}
 
     raise HTTPException(status_code=404, detail="分类不存在")
@@ -612,6 +738,27 @@ async def sync_article(request: ArticleSyncRequest, username: str = Depends(requ
         "title": request.title or article_path.stem
     }
 
+class ArticleUpdateRequest(BaseModel):
+    content: str  # Markdown 内容
+
+@app.put("/api/articles/{path:path}")
+async def update_article(path: str, request: ArticleUpdateRequest, username: str = Depends(require_auth)):
+    """编辑文章内容"""
+    # 安全校验：防止路径遍历
+    article_path = (ARTICLES_DIR / path).resolve()
+    if not str(article_path).startswith(str(ARTICLES_DIR.resolve())):
+        raise HTTPException(status_code=403, detail="禁止访问")
+
+    if not article_path.exists() or not article_path.suffix == ".md":
+        raise HTTPException(status_code=404, detail="文章不存在")
+
+    # 保存文件
+    with open(article_path, "w", encoding="utf-8") as f:
+        f.write(request.content)
+
+    record_update("update", "article", article_path.stem, f"路径: {path}", username)
+    return {"message": "文章已更新", "path": path}
+
 @app.delete("/api/articles/{path:path}")
 async def delete_article(path: str, username: str = Depends(require_auth)):
     """删除文章"""
@@ -623,8 +770,89 @@ async def delete_article(path: str, username: str = Depends(require_auth)):
     if not article_path.exists():
         raise HTTPException(status_code=404, detail="文章不存在")
 
+    article_name = article_path.stem
     article_path.unlink()
+    record_update("delete", "article", article_name, f"路径: {path}", username)
     return {"message": "文章已删除"}
+
+# 目录管理API
+@app.get("/api/folders")
+async def list_folders(username: str = Depends(require_auth)):
+    """获取文章目录列表"""
+    folders = []
+    if ARTICLES_DIR.exists():
+        for item in ARTICLES_DIR.iterdir():
+            if item.is_dir():
+                # 统计目录下的文章数量
+                article_count = len(list(item.rglob("*.md")))
+                folders.append({
+                    "name": item.name,
+                    "path": item.name,
+                    "article_count": article_count
+                })
+    return {"folders": folders}
+
+@app.post("/api/folders")
+async def create_folder(name: str, username: str = Depends(require_auth)):
+    """创建文章目录"""
+    # 安全校验
+    safe_name = name.replace("..", "").replace("/", "").replace("\\", "").strip()
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="目录名称无效")
+
+    folder_path = ARTICLES_DIR / safe_name
+    if folder_path.exists():
+        raise HTTPException(status_code=400, detail="目录已存在")
+
+    folder_path.mkdir(parents=True, exist_ok=True)
+    record_update("add", "folder", safe_name, "", username)
+    return {"message": "目录创建成功", "name": safe_name}
+
+class FolderRenameRequest(BaseModel):
+    new_name: str
+
+@app.put("/api/folders/{name}")
+async def rename_folder(name: str, request: FolderRenameRequest, username: str = Depends(require_auth)):
+    """重命名文章目录"""
+    # 安全校验
+    folder_path = (ARTICLES_DIR / name).resolve()
+    if not str(folder_path).startswith(str(ARTICLES_DIR.resolve())):
+        raise HTTPException(status_code=403, detail="禁止访问")
+
+    if not folder_path.exists() or not folder_path.is_dir():
+        raise HTTPException(status_code=404, detail="目录不存在")
+
+    safe_new_name = request.new_name.replace("..", "").replace("/", "").replace("\\", "").strip()
+    if not safe_new_name:
+        raise HTTPException(status_code=400, detail="新目录名称无效")
+
+    new_path = ARTICLES_DIR / safe_new_name
+    if new_path.exists():
+        raise HTTPException(status_code=400, detail="目标目录已存在")
+
+    folder_path.rename(new_path)
+    record_update("update", "folder", name, f"重命名为: {safe_new_name}", username)
+    return {"message": "目录重命名成功", "old_name": name, "new_name": safe_new_name}
+
+@app.delete("/api/folders/{name}")
+async def delete_folder(name: str, username: str = Depends(require_auth)):
+    """删除文章目录（包括其中的所有文章）"""
+    # 安全校验
+    folder_path = (ARTICLES_DIR / name).resolve()
+    if not str(folder_path).startswith(str(ARTICLES_DIR.resolve())):
+        raise HTTPException(status_code=403, detail="禁止访问")
+
+    if not folder_path.exists() or not folder_path.is_dir():
+        raise HTTPException(status_code=404, detail="目录不存在")
+
+    # 统计文章数量
+    article_count = len(list(folder_path.rglob("*.md")))
+
+    # 递归删除目录
+    import shutil
+    shutil.rmtree(folder_path)
+    record_update("delete", "folder", name, f"包含 {article_count} 篇文章", username)
+    return {"message": "目录已删除"}
 
 # SSRF 防护：URL 验证
 import ipaddress
@@ -759,20 +987,64 @@ async def fetch_favicon(request: FaviconRequest, username: str = Depends(require
 
     return {"icon": None, "message": "未能获取图标"}
 
+# 访问记录API
+@app.get("/api/visits")
+async def get_visits(
+    limit: int = 100,
+    username: str = Depends(require_auth)
+):
+    """获取访问记录（需要登录）"""
+    records = load_visit_log()
+    return {"visits": records[:limit], "total": len(records)}
+
+@app.delete("/api/visits")
+async def clear_visits(username: str = Depends(require_auth)):
+    """清空访问记录（需要登录）"""
+    save_visit_log([])
+    return {"message": "访问记录已清空"}
+
+# 更新记录API
+@app.get("/api/updates")
+async def get_updates(
+    limit: int = 100,
+    username: str = Depends(require_auth)
+):
+    """获取更新记录（需要登录）"""
+    records = load_update_log()
+    return {"updates": records[:limit], "total": len(records)}
+
+@app.delete("/api/updates")
+async def clear_updates(username: str = Depends(require_auth)):
+    """清空更新记录（需要登录）"""
+    save_update_log([])
+    return {"message": "更新记录已清空"}
+
 # 页面路由
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """导航主页"""
+    # 记录访问
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "")
+    record_visit(client_ip, "/", user_agent)
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/articles", response_class=HTMLResponse)
 async def articles_page(request: Request):
     """文章列表页"""
+    # 记录访问
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "")
+    record_visit(client_ip, "/articles", user_agent)
     return templates.TemplateResponse("article.html", {"request": request})
 
 @app.get("/articles/{path:path}", response_class=HTMLResponse)
 async def article_page(request: Request, path: str):
     """文章详情页"""
+    # 记录访问
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "")
+    record_visit(client_ip, f"/articles/{path}", user_agent)
     return templates.TemplateResponse("article.html", {"request": request, "path": path})
 
 if __name__ == "__main__":

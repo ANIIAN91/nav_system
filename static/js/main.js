@@ -217,6 +217,7 @@ function renderLinks() {
                 editLinkBtn.dataset.title = link.title || '';
                 editLinkBtn.dataset.url = link.url || '';
                 editLinkBtn.dataset.icon = link.icon || '';
+                editLinkBtn.dataset.category = category.name || '';
                 editLinkBtn.innerHTML = '&#9998;';
                 linkEl.appendChild(editLinkBtn);
             }
@@ -371,11 +372,11 @@ async function addLink(category, title, url, icon) {
 }
 
 // 更新链接
-async function updateLink(id, title, url, icon) {
+async function updateLink(id, title, url, icon, category) {
     try {
         const response = await api(`/api/links/${id}`, {
             method: 'PUT',
-            body: JSON.stringify({ title, url, icon: icon || null })
+            body: JSON.stringify({ title, url, icon: icon || null, category: category || null })
         });
 
         if (!response.ok) {
@@ -463,6 +464,20 @@ function openEditModal(data) {
     document.getElementById('edit-link-title').value = data.title;
     document.getElementById('edit-link-url').value = data.url;
     document.getElementById('edit-link-icon').value = data.icon;
+
+    // 填充分类选择器
+    const categorySelect = document.getElementById('edit-link-category');
+    categorySelect.innerHTML = '';
+    state.links.categories.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat.name;
+        option.textContent = cat.name;
+        if (cat.name === data.category) {
+            option.selected = true;
+        }
+        categorySelect.appendChild(option);
+    });
+
     openModal('edit-modal');
 }
 
@@ -734,7 +749,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const title = document.getElementById('edit-link-title').value;
         const url = document.getElementById('edit-link-url').value;
         const icon = document.getElementById('edit-link-icon').value;
-        updateLink(id, title, url, icon);
+        const category = document.getElementById('edit-link-category').value;
+        updateLink(id, title, url, icon, category);
     });
 
     // 删除链接按钮
@@ -837,7 +853,137 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('import-sunpanel-btn')?.addEventListener('click', () => {
         importLinks('sunpanel');
     });
+
+    // 访问记录相关
+    document.getElementById('refresh-visits-btn')?.addEventListener('click', loadVisits);
+    document.getElementById('clear-visits-btn')?.addEventListener('click', clearVisits);
+
+    // 更新记录相关
+    document.getElementById('refresh-updates-btn')?.addEventListener('click', loadUpdates);
+    document.getElementById('clear-updates-btn')?.addEventListener('click', clearUpdates);
+
+    // 标签页切换时加载记录
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (btn.dataset.tab === 'visit-log') {
+                loadVisits();
+            } else if (btn.dataset.tab === 'update-log') {
+                loadUpdates();
+            }
+        });
+    });
 });
+
+// 加载访问记录
+async function loadVisits() {
+    try {
+        const response = await api('/api/visits?limit=200');
+        if (!response.ok) {
+            throw new Error('加载失败');
+        }
+        const data = await response.json();
+        renderVisits(data.visits, data.total);
+    } catch (error) {
+        console.error('加载访问记录失败:', error);
+        document.getElementById('visit-table-body').innerHTML =
+            '<tr><td colspan="3" style="padding: 20px; text-align: center; color: var(--danger-color);">加载失败</td></tr>';
+    }
+}
+
+// 渲染访问记录
+function renderVisits(visits, total) {
+    document.getElementById('visit-total').textContent = total;
+    const tbody = document.getElementById('visit-table-body');
+
+    if (!visits || visits.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="padding: 20px; text-align: center; color: var(--text-muted);">暂无访问记录</td></tr>';
+        return;
+    }
+
+    let html = '';
+    visits.forEach(visit => {
+        html += `<tr>
+            <td style="padding: 8px 10px; border-bottom: 1px solid var(--border-color);">${escapeHtml(visit.time)}</td>
+            <td style="padding: 8px 10px; border-bottom: 1px solid var(--border-color);">${escapeHtml(visit.ip)}</td>
+            <td style="padding: 8px 10px; border-bottom: 1px solid var(--border-color);">${escapeHtml(visit.path)}</td>
+        </tr>`;
+    });
+    tbody.innerHTML = html;
+}
+
+// 清空访问记录
+async function clearVisits() {
+    if (!confirm('确定要清空所有访问记录吗？')) return;
+
+    try {
+        const response = await api('/api/visits', { method: 'DELETE' });
+        if (!response.ok) {
+            throw new Error('清空失败');
+        }
+        loadVisits();
+        alert('访问记录已清空');
+    } catch (error) {
+        alert('清空失败: ' + error.message);
+    }
+}
+
+// 加载更新记录
+async function loadUpdates() {
+    try {
+        const response = await api('/api/updates?limit=200');
+        if (!response.ok) {
+            throw new Error('加载失败');
+        }
+        const data = await response.json();
+        renderUpdates(data.updates, data.total);
+    } catch (error) {
+        console.error('加载更新记录失败:', error);
+        document.getElementById('update-table-body').innerHTML =
+            '<tr><td colspan="5" style="padding: 20px; text-align: center; color: var(--danger-color);">加载失败</td></tr>';
+    }
+}
+
+// 渲染更新记录
+function renderUpdates(updates, total) {
+    document.getElementById('update-total').textContent = total;
+    const tbody = document.getElementById('update-table-body');
+
+    if (!updates || updates.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: var(--text-muted);">暂无更新记录</td></tr>';
+        return;
+    }
+
+    const actionMap = { add: '添加', update: '修改', delete: '删除', move: '移动' };
+    const typeMap = { link: '链接', category: '分类', article: '文章', folder: '目录', settings: '设置' };
+
+    let html = '';
+    updates.forEach(update => {
+        html += `<tr>
+            <td style="padding: 8px 10px; border-bottom: 1px solid var(--border-color);">${escapeHtml(update.time)}</td>
+            <td style="padding: 8px 10px; border-bottom: 1px solid var(--border-color);">${escapeHtml(actionMap[update.action] || update.action)}</td>
+            <td style="padding: 8px 10px; border-bottom: 1px solid var(--border-color);">${escapeHtml(typeMap[update.target_type] || update.target_type)}</td>
+            <td style="padding: 8px 10px; border-bottom: 1px solid var(--border-color);">${escapeHtml(update.target_name)}</td>
+            <td style="padding: 8px 10px; border-bottom: 1px solid var(--border-color); font-size: 12px; color: var(--text-muted);">${escapeHtml(update.details || '')}</td>
+        </tr>`;
+    });
+    tbody.innerHTML = html;
+}
+
+// 清空更新记录
+async function clearUpdates() {
+    if (!confirm('确定要清空所有更新记录吗？')) return;
+
+    try {
+        const response = await api('/api/updates', { method: 'DELETE' });
+        if (!response.ok) {
+            throw new Error('清空失败');
+        }
+        loadUpdates();
+        alert('更新记录已清空');
+    } catch (error) {
+        alert('清空失败: ' + error.message);
+    }
+}
 
 // 导入导航数据
 async function importLinks(format) {

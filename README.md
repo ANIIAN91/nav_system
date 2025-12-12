@@ -48,8 +48,20 @@
 ### 数据管理
 - 前端界面添加/修改/删除导航链接
 - 前端界面添加/编辑/删除分类
+- **链接分类移动**：编辑链接时可更改所属分类
 - 站点设置可编辑（登录后）
 - 响应式设计，适配不同设备
+- **管理面板**：左右分栏布局，左侧导航右侧内容可滚动
+
+### 文章管理
+- **在线编辑**：登录后可直接编辑文章内容
+- **文章删除**：支持删除文章
+- **目录管理**：创建、重命名、删除文章目录
+
+### 访问与更新记录
+- **访问记录**：记录用户访问的 IP、路径、时间（最多保留 1000 条）
+- **更新记录**：记录链接、分类、文章、目录的增删改操作（最多保留 500 条）
+- 支持查看和清空记录
 
 
 ## 展示
@@ -85,7 +97,9 @@ Homepage/
 │   └── article.html         # 文章展示页
 ├── data/
 │   ├── links.json           # 导航链接配置
-│   └── settings.json        # 站点设置
+│   ├── settings.json        # 站点设置
+│   ├── visit_log.json       # 访问记录
+│   └── update_log.json      # 更新记录
 ├── articles/                # Markdown 文章目录
 │   ├── tech/
 │   └── notes/
@@ -224,6 +238,7 @@ export ADMIN_PASSWORD_HASH=$(python -c "from passlib.context import CryptContext
 4. 启动服务：
 ```bash
 uvicorn main:app --host 0.0.0.0 --port 8100
+python -m uvicorn main:app --host 0.0.0.0 --port 8100
 ```
 
 5. 访问 `http://localhost:8100`
@@ -271,9 +286,28 @@ uvicorn main:app --host 0.0.0.0 --port 8100
 | GET | `/api/articles` | 获取文章列表（根据登录状态过滤受保护目录） | 否 |
 | GET | `/api/articles/{path}` | 获取文章内容 | 否* |
 | POST | `/api/articles/sync` | 同步文章（从 Obsidian 等工具推送） | 是 |
+| PUT | `/api/articles/{path}` | 编辑文章内容 | 是 |
 | DELETE | `/api/articles/{path}` | 删除文章 | 是 |
 
 > *受保护目录下的文章需要登录才能访问
+
+### 目录管理接口
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| GET | `/api/folders` | 获取文章目录列表 | 是 |
+| POST | `/api/folders?name={name}` | 创建文章目录 | 是 |
+| PUT | `/api/folders/{name}` | 重命名文章目录 | 是 |
+| DELETE | `/api/folders/{name}` | 删除文章目录（含所有文章） | 是 |
+
+### 访问与更新记录接口
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| GET | `/api/visits?limit=100` | 获取访问记录 | 是 |
+| DELETE | `/api/visits` | 清空访问记录 | 是 |
+| GET | `/api/updates?limit=100` | 获取更新记录 | 是 |
+| DELETE | `/api/updates` | 清空更新记录 | 是 |
 
 ### 图标接口
 

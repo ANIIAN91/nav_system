@@ -1,24 +1,6 @@
 {
   "categories": [
     {
-      "name": "Github",
-      "auth_required": false,
-      "links": [
-        {
-          "id": "29c8e627-e3a5-4177-a1a9-f5b0eb986644",
-          "title": "llm-council",
-          "url": "https://github.com/karpathy/llm-council/tree/master",
-          "icon": null
-        },
-        {
-          "id": "b887c6d9-32ba-41d6-8a21-3ea1b82e8551",
-          "title": "ai-by-hand-excel",
-          "url": "https://github.com/ImagineAILab/ai-by-hand-excel",
-          "icon": null
-        }
-      ]
-    },
-    {
       "name": "Me",
       "auth_required": true,
       "links": [
@@ -92,6 +74,24 @@
           "id": "cb8fc358-c1a3-40a8-ace7-497944ed37aa",
           "title": "cc switch",
           "url": "https://switch.aniian.com",
+          "icon": null
+        }
+      ]
+    },
+    {
+      "name": "Github",
+      "auth_required": false,
+      "links": [
+        {
+          "id": "29c8e627-e3a5-4177-a1a9-f5b0eb986644",
+          "title": "llm-council",
+          "url": "https://github.com/karpathy/llm-council/tree/master",
+          "icon": null
+        },
+        {
+          "id": "b887c6d9-32ba-41d6-8a21-3ea1b82e8551",
+          "title": "ai-by-hand-excel",
+          "url": "https://github.com/ImagineAILab/ai-by-hand-excel",
           "icon": null
         }
       ]

@@ -21,17 +21,82 @@
         <main class="main-content article-page">
             <!-- 文章列表 -->
             <aside id="article-list" class="article-sidebar">
-                <h3>文章目录</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h3 style="margin: 0;">文章目录</h3>
+                    <button id="manage-folders-btn" class="btn btn-secondary" style="display: none; padding: 5px 10px; font-size: 12px;">管理</button>
+                </div>
                 <div id="articles-tree"></div>
             </aside>
 
             <!-- 文章内容 -->
             <article id="article-content" class="article-content">
+                <div id="article-toolbar" style="display: none; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color);">
+                    <button id="edit-article-btn" class="btn btn-secondary" style="margin-right: 10px;">编辑</button>
+                    <button id="delete-article-btn" class="btn btn-danger">删除</button>
+                </div>
                 <div id="article-body">
                     <p class="placeholder">请从左侧选择文章</p>
                 </div>
             </article>
         </main>
+
+        <!-- 编辑文章弹窗 -->
+        <div id="edit-article-modal" class="modal">
+            <div class="modal-content" style="max-width: 900px; width: 90%;">
+                <span class="close">&times;</span>
+                <h2>编辑文章</h2>
+                <form id="edit-article-form">
+                    <input type="hidden" id="edit-article-path">
+                    <div class="form-group">
+                        <label for="edit-article-content">内容 (Markdown)</label>
+                        <textarea id="edit-article-content" name="content" rows="20" style="width: 100%; font-family: monospace; resize: vertical;"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">保存</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('edit-article-modal')">取消</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 目录管理弹窗 -->
+        <div id="folder-modal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>目录管理</h2>
+                <div class="form-group">
+                    <label>新建目录</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="new-folder-name" placeholder="目录名称" style="flex: 1;">
+                        <button type="button" id="create-folder-btn" class="btn btn-primary">创建</button>
+                    </div>
+                </div>
+                <hr style="margin: 20px 0; border-color: var(--border-color);">
+                <div class="form-group">
+                    <label>现有目录</label>
+                    <div id="folder-list" style="max-height: 300px; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 编辑目录弹窗 -->
+        <div id="edit-folder-modal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>编辑目录</h2>
+                <form id="edit-folder-form">
+                    <input type="hidden" id="edit-folder-old-name">
+                    <div class="form-group">
+                        <label for="edit-folder-name">目录名称</label>
+                        <input type="text" id="edit-folder-name" name="name" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">保存</button>
+                        <button type="button" id="delete-folder-btn" class="btn btn-danger">删除目录</button>
+                    </div>
+                </form>
+            </div>
+        </div>
 
         <!-- 底部 -->
         <footer class="footer">
@@ -44,6 +109,29 @@
     <script>
         // 检查登录状态（token 可能在 localStorage 或 sessionStorage 中）
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        let currentArticlePath = null;
+        let currentArticleContent = null;
+
+        // API 请求封装
+        async function api(url, options = {}) {
+            const headers = {
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            return fetch(url, { ...options, headers });
+        }
+
+        // 弹窗控制
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
 
         // 主题切换
         function initTheme() {
@@ -64,6 +152,13 @@
             const btn = document.getElementById('theme-toggle');
             if (btn) {
                 btn.innerHTML = theme === 'light' ? '&#9728;' : '&#9790;';
+            }
+        }
+
+        // 更新UI（根据登录状态显示管理按钮）
+        function updateUI() {
+            if (token) {
+                document.getElementById('manage-folders-btn').style.display = 'block';
             }
         }
 
@@ -111,6 +206,14 @@
             }
         }
 
+        // HTML 转义
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         // 渲染文章树（带折叠功能）
         function renderArticleTree(articles) {
             const tree = document.getElementById('articles-tree');
@@ -132,13 +235,13 @@
             let html = '';
             for (const [category, items] of Object.entries(categories)) {
                 const isCollapsed = collapsedState[category] === true;
-                html += `<div class="article-category ${isCollapsed ? 'collapsed' : ''}" data-category="${category}">
+                html += `<div class="article-category ${isCollapsed ? 'collapsed' : ''}" data-category="${escapeHtml(category)}">
                     <div class="article-category-header">
-                        <h4><span class="collapse-icon">&#9660;</span> ${category}</h4>
+                        <h4><span class="collapse-icon">&#9660;</span> ${escapeHtml(category)}</h4>
                     </div>
                     <ul>`;
                 items.forEach(item => {
-                    html += `<li><a href="#" data-path="${item.path}">${item.title}</a></li>`;
+                    html += `<li><a href="#" data-path="${escapeHtml(item.path)}">${escapeHtml(item.title)}</a></li>`;
                 });
                 html += `</ul></div>`;
             }
@@ -189,8 +292,181 @@
                 }
                 const data = await response.json();
                 document.getElementById('article-body').innerHTML = data.html;
+
+                // 保存当前文章信息
+                currentArticlePath = path;
+                currentArticleContent = data.content;
+
+                // 如果已登录，显示工具栏
+                if (token) {
+                    document.getElementById('article-toolbar').style.display = 'block';
+                }
             } catch (error) {
                 document.getElementById('article-body').innerHTML = `<p class="error">加载失败: ${error.message}</p>`;
+                currentArticlePath = null;
+                currentArticleContent = null;
+                document.getElementById('article-toolbar').style.display = 'none';
+            }
+        }
+
+        // 编辑文章
+        function openEditArticleModal() {
+            if (!currentArticlePath || !currentArticleContent) {
+                alert('请先选择一篇文章');
+                return;
+            }
+            document.getElementById('edit-article-path').value = currentArticlePath;
+            document.getElementById('edit-article-content').value = currentArticleContent;
+            openModal('edit-article-modal');
+        }
+
+        // 保存文章
+        async function saveArticle(path, content) {
+            try {
+                const response = await api(`/api/articles/${path}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ content })
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || '保存失败');
+                }
+                closeModal('edit-article-modal');
+                loadArticle(path);
+                alert('文章已保存');
+            } catch (error) {
+                alert('保存失败: ' + error.message);
+            }
+        }
+
+        // 删除文章
+        async function deleteArticle() {
+            if (!currentArticlePath) {
+                alert('请先选择一篇文章');
+                return;
+            }
+            if (!confirm('确定要删除这篇文章吗？此操作不可恢复。')) return;
+
+            try {
+                const response = await api(`/api/articles/${currentArticlePath}`, {
+                    method: 'DELETE'
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || '删除失败');
+                }
+                currentArticlePath = null;
+                currentArticleContent = null;
+                document.getElementById('article-body').innerHTML = '<p class="placeholder">文章已删除</p>';
+                document.getElementById('article-toolbar').style.display = 'none';
+                loadArticles();
+                alert('文章已删除');
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
+        }
+
+        // 加载目录列表
+        async function loadFolders() {
+            try {
+                const response = await api('/api/folders');
+                if (!response.ok) throw new Error('加载失败');
+                const data = await response.json();
+                renderFolders(data.folders);
+            } catch (error) {
+                document.getElementById('folder-list').innerHTML = '<p style="color: var(--danger-color);">加载失败</p>';
+            }
+        }
+
+        // 渲染目录列表
+        function renderFolders(folders) {
+            const container = document.getElementById('folder-list');
+            if (!folders || folders.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-muted);">暂无目录</p>';
+                return;
+            }
+
+            let html = '';
+            folders.forEach(folder => {
+                html += `<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--border-color);">
+                    <span>${escapeHtml(folder.name)} <small style="color: var(--text-muted);">(${folder.article_count} 篇)</small></span>
+                    <button class="btn btn-secondary edit-folder-btn" data-name="${escapeHtml(folder.name)}" style="padding: 5px 10px; font-size: 12px;">编辑</button>
+                </div>`;
+            });
+            container.innerHTML = html;
+
+            // 绑定编辑按钮事件
+            container.querySelectorAll('.edit-folder-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    openEditFolderModal(btn.dataset.name);
+                });
+            });
+        }
+
+        // 创建目录
+        async function createFolder(name) {
+            try {
+                const response = await api(`/api/folders?name=${encodeURIComponent(name)}`, {
+                    method: 'POST'
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || '创建失败');
+                }
+                document.getElementById('new-folder-name').value = '';
+                loadFolders();
+                loadArticles();
+                alert('目录创建成功');
+            } catch (error) {
+                alert('创建失败: ' + error.message);
+            }
+        }
+
+        // 打开编辑目录弹窗
+        function openEditFolderModal(name) {
+            document.getElementById('edit-folder-old-name').value = name;
+            document.getElementById('edit-folder-name').value = name;
+            openModal('edit-folder-modal');
+        }
+
+        // 重命名目录
+        async function renameFolder(oldName, newName) {
+            try {
+                const response = await api(`/api/folders/${encodeURIComponent(oldName)}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ new_name: newName })
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || '重命名失败');
+                }
+                closeModal('edit-folder-modal');
+                loadFolders();
+                loadArticles();
+                alert('目录重命名成功');
+            } catch (error) {
+                alert('重命名失败: ' + error.message);
+            }
+        }
+
+        // 删除目录
+        async function deleteFolder(name) {
+            if (!confirm(`确定要删除目录 "${name}" 及其中的所有文章吗？此操作不可恢复。`)) return;
+
+            try {
+                const response = await api(`/api/folders/${encodeURIComponent(name)}`, {
+                    method: 'DELETE'
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || '删除失败');
+                }
+                closeModal('edit-folder-modal');
+                loadFolders();
+                loadArticles();
+                alert('目录已删除');
+            } catch (error) {
+                alert('删除失败: ' + error.message);
             }
         }
 
@@ -205,11 +481,76 @@
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
             initTheme();
+            updateUI();
             loadSettings();
             loadArticles();
             checkUrlPath();
 
             document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
+
+            // 编辑文章按钮
+            document.getElementById('edit-article-btn')?.addEventListener('click', openEditArticleModal);
+
+            // 删除文章按钮
+            document.getElementById('delete-article-btn')?.addEventListener('click', deleteArticle);
+
+            // 编辑文章表单
+            document.getElementById('edit-article-form')?.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const path = document.getElementById('edit-article-path').value;
+                const content = document.getElementById('edit-article-content').value;
+                saveArticle(path, content);
+            });
+
+            // 目录管理按钮
+            document.getElementById('manage-folders-btn')?.addEventListener('click', () => {
+                loadFolders();
+                openModal('folder-modal');
+            });
+
+            // 创建目录按钮
+            document.getElementById('create-folder-btn')?.addEventListener('click', () => {
+                const name = document.getElementById('new-folder-name').value.trim();
+                if (!name) {
+                    alert('请输入目录名称');
+                    return;
+                }
+                createFolder(name);
+            });
+
+            // 编辑目录表单
+            document.getElementById('edit-folder-form')?.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const oldName = document.getElementById('edit-folder-old-name').value;
+                const newName = document.getElementById('edit-folder-name').value.trim();
+                if (!newName) {
+                    alert('请输入目录名称');
+                    return;
+                }
+                renameFolder(oldName, newName);
+            });
+
+            // 删除目录按钮
+            document.getElementById('delete-folder-btn')?.addEventListener('click', () => {
+                const name = document.getElementById('edit-folder-old-name').value;
+                deleteFolder(name);
+            });
+
+            // 关闭弹窗
+            document.querySelectorAll('.modal .close').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    btn.closest('.modal').classList.remove('active');
+                });
+            });
+
+            // 点击弹窗外部关闭
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.classList.remove('active');
+                    }
+                });
+            });
         });
     </script>
 </body>

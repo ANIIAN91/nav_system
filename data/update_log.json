@@ -1,0 +1,18 @@
+[
+  {
+    "action": "delete",
+    "target_type": "folder",
+    "target_name": "123",
+    "details": "包含 0 篇文章",
+    "username": "admin",
+    "time": "2025-12-12 13:43:56"
+  },
+  {
+    "action": "add",
+    "target_type": "folder",
+    "target_name": "123",
+    "details": "",
+    "username": "admin",
+    "time": "2025-12-12 13:43:39"
+  }
+]

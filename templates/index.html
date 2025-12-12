@@ -70,13 +70,17 @@
     <div id="manage-modal" class="modal">
         <div class="modal-content modal-large">
             <span class="close">&times;</span>
-            <h2>链接管理</h2>
-            <div class="manage-tabs">
-                <button class="tab-btn active" data-tab="add-link">添加链接</button>
-                <button class="tab-btn" data-tab="add-category">添加分类</button>
-                <button class="tab-btn" data-tab="site-settings">站点设置</button>
-                <button class="tab-btn" data-tab="import-export">导入导出</button>
-            </div>
+            <h2>管理</h2>
+            <div class="manage-layout">
+                <div class="manage-tabs">
+                    <button class="tab-btn active" data-tab="add-link">添加链接</button>
+                    <button class="tab-btn" data-tab="add-category">添加分类</button>
+                    <button class="tab-btn" data-tab="site-settings">站点设置</button>
+                    <button class="tab-btn" data-tab="import-export">导入导出</button>
+                    <button class="tab-btn" data-tab="visit-log">访问记录</button>
+                    <button class="tab-btn" data-tab="update-log">更新记录</button>
+                </div>
+                <div class="manage-content">
             <div id="add-link" class="tab-content active">
                 <form id="add-link-form">
                     <div class="form-group">
@@ -174,6 +178,59 @@
                     <small style="color: var(--text-muted);">此 Token 用于 Obsidian 插件或 Python 脚本同步文章</small>
                 </div>
             </div>
+            <div id="visit-log" class="tab-content">
+                <div class="form-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <label style="margin: 0;">访问记录 (<span id="visit-total">0</span> 条)</label>
+                        <div style="display: flex; gap: 10px;">
+                            <button type="button" id="refresh-visits-btn" class="btn btn-secondary">刷新</button>
+                            <button type="button" id="clear-visits-btn" class="btn btn-danger">清空</button>
+                        </div>
+                    </div>
+                    <div id="visit-list" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                            <thead style="position: sticky; top: 0; background: var(--bg-secondary);">
+                                <tr>
+                                    <th style="padding: 10px; text-align: left; border-bottom: 1px solid var(--border-color);">时间</th>
+                                    <th style="padding: 10px; text-align: left; border-bottom: 1px solid var(--border-color);">IP</th>
+                                    <th style="padding: 10px; text-align: left; border-bottom: 1px solid var(--border-color);">路径</th>
+                                </tr>
+                            </thead>
+                            <tbody id="visit-table-body">
+                                <tr><td colspan="3" style="padding: 20px; text-align: center; color: var(--text-muted);">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div id="update-log" class="tab-content">
+                <div class="form-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <label style="margin: 0;">更新记录 (<span id="update-total">0</span> 条)</label>
+                        <div style="display: flex; gap: 10px;">
+                            <button type="button" id="refresh-updates-btn" class="btn btn-secondary">刷新</button>
+                            <button type="button" id="clear-updates-btn" class="btn btn-danger">清空</button>
+                        </div>
+                    </div>
+                    <div id="update-list" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                            <thead style="position: sticky; top: 0; background: var(--bg-secondary);">
+                                <tr>
+                                    <th style="padding: 10px; text-align: left; border-bottom: 1px solid var(--border-color);">时间</th>
+                                    <th style="padding: 10px; text-align: left; border-bottom: 1px solid var(--border-color);">操作</th>
+                                    <th style="padding: 10px; text-align: left; border-bottom: 1px solid var(--border-color);">类型</th>
+                                    <th style="padding: 10px; text-align: left; border-bottom: 1px solid var(--border-color);">目标</th>
+                                    <th style="padding: 10px; text-align: left; border-bottom: 1px solid var(--border-color);">详情</th>
+                                </tr>
+                            </thead>
+                            <tbody id="update-table-body">
+                                <tr><td colspan="5" style="padding: 20px; text-align: center; color: var(--text-muted);">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                </div><!-- .manage-content -->
+            </div><!-- .manage-layout -->
         </div>
     </div>
 
@@ -184,6 +241,10 @@
             <h2>编辑链接</h2>
             <form id="edit-link-form">
                 <input type="hidden" id="edit-link-id">
+                <div class="form-group">
+                    <label for="edit-link-category">所属分类</label>
+                    <select id="edit-link-category" name="category" required></select>
+                </div>
                 <div class="form-group">
                     <label for="edit-link-title">标题</label>
                     <input type="text" id="edit-link-title" name="title" required>

@@ -364,7 +364,7 @@ body {
 }
 
 .modal-large {
-    max-width: 500px;
+    max-width: 800px;
 }
 
 .modal .close {
@@ -444,28 +444,70 @@ body {
     margin-top: 10px;
 }
 
-/* 标签页 */
+/* 管理弹窗布局 */
+.manage-layout {
+    display: flex;
+    gap: 20px;
+    height: 450px;
+}
+
+/* 标签页 - 左侧导航 */
 .manage-tabs {
     display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 10px;
+    flex-direction: column;
+    gap: 5px;
+    width: 100px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border-color);
+    padding-right: 15px;
 }
 
 .tab-btn {
-    padding: 8px 16px;
+    padding: 10px 12px;
     background: transparent;
     border: none;
     color: var(--text-muted);
     cursor: pointer;
     border-radius: 6px;
     transition: all 0.3s;
+    white-space: nowrap;
+    font-size: 13px;
+    text-align: left;
+}
+
+.tab-btn:hover {
+    background: var(--link-hover-bg);
 }
 
 .tab-btn.active {
     background: var(--primary-color);
     color: white;
+}
+
+/* 右侧内容区 */
+.manage-content {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 5px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
+}
+
+.manage-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.manage-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.manage-content::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.manage-content::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-color);
 }
 
 .tab-content {
@@ -717,6 +759,28 @@ body {
 
     .link-item {
         padding: 12px 8px;
+    }
+
+    /* 管理弹窗移动端 */
+    .manage-layout {
+        flex-direction: column;
+        height: auto;
+        max-height: 70vh;
+    }
+
+    .manage-tabs {
+        flex-direction: row;
+        flex-wrap: wrap;
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        padding-right: 0;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
+
+    .manage-content {
+        max-height: 50vh;
     }
 
     .link-icon {

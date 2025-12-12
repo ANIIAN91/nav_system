@@ -150,6 +150,11 @@
                         <label for="footer-copyright">版权信息</label>
                         <input type="text" id="footer-copyright" name="copyright" placeholder="例如: © 2024 Your Name">
                     </div>
+                    <div class="form-group">
+                        <label for="analytics-code">统计分析代码</label>
+                        <textarea id="analytics-code" name="analytics_code" rows="6" style="width: 100%; font-family: monospace; font-size: 12px; resize: vertical;" placeholder="粘贴百度统计、Google Analytics 等统计代码"></textarea>
+                        <small style="color: var(--text-muted);">支持任意 JavaScript 统计代码，将自动添加到所有页面</small>
+                    </div>
                     <button type="submit" class="btn btn-primary">保存</button>
                 </form>
             </div>
@@ -299,6 +304,11 @@
             </form>
         </div>
     </div>
+
+    {% if settings and settings.analytics_code %}
+    <!-- 统计分析代码 -->
+    {{ settings.analytics_code | safe }}
+    {% endif %}
 
     <script src="/static/js/main.js"></script>
 </body>

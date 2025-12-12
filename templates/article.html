@@ -106,6 +106,14 @@
         </footer>
     </div>
 
+    <!-- 回到顶部按钮 -->
+    <button id="back-to-top" class="back-to-top" title="回到顶部">&#9650;</button>
+
+    {% if settings and settings.analytics_code %}
+    <!-- 统计分析代码 -->
+    {{ settings.analytics_code | safe }}
+    {% endif %}
+
     <script>
         // 检查登录状态（token 可能在 localStorage 或 sessionStorage 中）
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -478,6 +486,29 @@
             }
         }
 
+        // 回到顶部按钮逻辑
+        function initBackToTop() {
+            const backToTopBtn = document.getElementById('back-to-top');
+            if (!backToTopBtn) return;
+
+            // 监听滚动事件，控制按钮显示/隐藏
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 300) {
+                    backToTopBtn.classList.add('visible');
+                } else {
+                    backToTopBtn.classList.remove('visible');
+                }
+            });
+
+            // 点击按钮滚动到顶部
+            backToTopBtn.addEventListener('click', () => {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            });
+        }
+
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
             initTheme();
@@ -485,6 +516,7 @@
             loadSettings();
             loadArticles();
             checkUrlPath();
+            initBackToTop();
 
             document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
 

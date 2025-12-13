@@ -10,14 +10,16 @@
     <div class="container">
         <!-- 头部 -->
         <header class="header">
-            <div class="clock" id="clock"></div>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div class="clock" id="clock"></div>
+            </div>
             <div class="user-area">
-                <button id="theme-toggle" class="theme-toggle" title="切换主题">&#9790;</button>
+                <button id="theme-toggle" class="btn btn-secondary" title="切换主题">&#9790;</button>
                 <span id="username-display" style="display: none;"></span>
-                <button id="login-btn" class="btn btn-primary">登录</button>
-                <button id="logout-btn" class="btn btn-secondary" style="display: none;">登出</button>
-                <button id="manage-btn" class="btn btn-secondary" style="display: none;">管理</button>
                 <a href="/articles" id="articles-btn" class="btn btn-secondary">文章</a>
+                <button id="manage-btn" class="btn btn-secondary" style="display: none;">管理</button>
+                <button id="logout-btn" class="btn btn-secondary" style="display: none;">登出</button>
+                <button id="login-btn" class="btn btn-primary">登录</button>
             </div>
         </header>
 

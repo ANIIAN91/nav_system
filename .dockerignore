@@ -1,26 +1,56 @@
-__pycache__
+# Python cache
+__pycache__/
 *.pyc
 *.pyo
-.git
+*.pyd
+.Python
+*.so
+
+# Git
+.git/
 .gitignore
+.github/
+
+# Environment (NEVER include in image)
 .env
-.env.example
+.env.*
+*.env
+
+# Documentation (except README for reference)
 *.md
 !README.md
-.DS_Store
 
-# 数据目录（通过 volume 挂载）
+# OS files
+.DS_Store
+Thumbs.db
+
+# Data directories (mount as volumes)
 data/
 articles/
 static/icons/
 
-# 开发和部署脚本
+# Development files
 *.log
 *.tmp
+*.bak
+.pytest_cache/
+.coverage
+htmlcov/
+tests/
+venv/
+.venv/
+.idea/
+.vscode/
+
+# Build scripts
 init.sh
 migrate.sh
 build.sh
-docker-compose.hub.yml
+docker-compose*.yml
 
-# 导出文件
+# Archives
 *.tar.gz
+*.zip
+
+# Obsidian plugin (optional, not needed in container)
+obsidian-plugin/

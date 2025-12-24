@@ -9,7 +9,7 @@ from app.models import Setting
 from app.schemas.setting import SiteSettings
 from app.routers.auth import require_auth
 
-router = APIRouter(prefix="/api/settings", tags=["settings"])
+router = APIRouter(prefix="/api/v1/settings", tags=["settings"])
 
 SETTINGS_KEYS = [
     "icp", "copyright", "article_page_title", "site_title",
@@ -72,5 +72,7 @@ async def update_settings(
                 setting.value = str(value) if value is not None else ""
             else:
                 db.add(Setting(key=key, value=str(value) if value is not None else ""))
+
+    await db.commit()
 
     return {"message": "设置已保存", "settings": await get_site_settings(db)}

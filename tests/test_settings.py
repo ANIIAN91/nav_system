@@ -4,7 +4,7 @@ import pytest
 @pytest.mark.asyncio
 async def test_get_settings(client):
     """Test getting settings"""
-    response = await client.get("/api/settings")
+    response = await client.get("/api/v1/settings")
     assert response.status_code == 200
     data = response.json()
     # Check default values
@@ -15,7 +15,7 @@ async def test_get_settings(client):
 async def test_update_settings_unauthenticated(client):
     """Test updating settings without authentication fails"""
     response = await client.put(
-        "/api/settings",
+        "/api/v1/settings",
         json={"site_title": "New Title"}
     )
     assert response.status_code == 401
@@ -24,7 +24,7 @@ async def test_update_settings_unauthenticated(client):
 async def test_update_settings_authenticated(client, auth_headers):
     """Test updating settings with authentication"""
     response = await client.put(
-        "/api/settings",
+        "/api/v1/settings",
         json={
             "site_title": "New Title",
             "link_size": "large",

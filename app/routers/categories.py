@@ -9,7 +9,7 @@ from app.services.link import LinkService
 from app.services.log import LogService
 from app.routers.auth import require_auth
 
-router = APIRouter(prefix="/api/categories", tags=["categories"])
+router = APIRouter(prefix="/api/v1/categories", tags=["categories"])
 
 @router.post("")
 async def add_category(
@@ -30,6 +30,7 @@ async def add_category(
         "add", "category", category.name,
         f"私密: {'是' if category.auth_required else '否'}", username
     )
+    await db.commit()
 
     return {"message": "添加成功", "category": {"name": result.name, "auth_required": result.auth_required}}
 
@@ -55,6 +56,7 @@ async def update_category(
 
     details = f"重命名为: {category.name}" if category.name != category_name else f"私密: {'是' if category.auth_required else '否'}"
     await log_service.record_update("update", "category", category_name, details, username)
+    await db.commit()
 
     return {"message": "更新成功", "category": {"name": result.name, "auth_required": result.auth_required}}
 
@@ -73,6 +75,7 @@ async def delete_category(
         raise HTTPException(status_code=404, detail="分类不存在")
 
     await log_service.record_update("delete", "category", category_name, "", username)
+    await db.commit()
     return {"message": "删除成功"}
 
 @router.post("/{category_name}/reorder")
@@ -87,4 +90,5 @@ async def reorder_category(
     success = await service.reorder_category(category_name, request.direction)
     if not success:
         return {"message": "无法移动"}
+    await db.commit()
     return {"message": "移动成功"}

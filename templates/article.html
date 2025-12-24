@@ -173,7 +173,7 @@
         // 加载站点设置
         async function loadSettings() {
             try {
-                const response = await fetch('/api/settings');
+                const response = await fetch('/api/v1/settings');
                 const settings = await response.json();
 
                 // 更新页面标题
@@ -206,7 +206,7 @@
                 if (token) {
                     headers['Authorization'] = `Bearer ${token}`;
                 }
-                const response = await fetch('/api/articles', { headers });
+                const response = await fetch('/api/v1/articles', { headers });
                 const data = await response.json();
                 renderArticleTree(data.articles);
             } catch (error) {
@@ -293,7 +293,7 @@
                 if (token) {
                     headers['Authorization'] = `Bearer ${token}`;
                 }
-                const response = await fetch(`/api/articles/${path}`, { headers });
+                const response = await fetch(`/api/v1/articles/${path}`, { headers });
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
                     throw new Error(errorData.detail || '文章不存在');
@@ -331,7 +331,7 @@
         // 保存文章
         async function saveArticle(path, content) {
             try {
-                const response = await api(`/api/articles/${path}`, {
+                const response = await api(`/api/v1/articles/${path}`, {
                     method: 'PUT',
                     body: JSON.stringify({ content })
                 });
@@ -356,7 +356,7 @@
             if (!confirm('确定要删除这篇文章吗？此操作不可恢复。')) return;
 
             try {
-                const response = await api(`/api/articles/${currentArticlePath}`, {
+                const response = await api(`/api/v1/articles/${currentArticlePath}`, {
                     method: 'DELETE'
                 });
                 if (!response.ok) {
@@ -377,7 +377,7 @@
         // 加载目录列表
         async function loadFolders() {
             try {
-                const response = await api('/api/folders');
+                const response = await api('/api/v1/folders');
                 if (!response.ok) throw new Error('加载失败');
                 const data = await response.json();
                 renderFolders(data.folders);

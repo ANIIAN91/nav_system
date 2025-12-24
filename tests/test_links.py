@@ -5,7 +5,7 @@ import pytest_asyncio
 @pytest.mark.asyncio
 async def test_get_links_unauthenticated(client):
     """Test getting links without authentication"""
-    response = await client.get("/api/links")
+    response = await client.get("/api/v1/links")
     assert response.status_code == 200
     data = response.json()
     assert "categories" in data
@@ -14,7 +14,7 @@ async def test_get_links_unauthenticated(client):
 async def test_add_link_unauthenticated(client):
     """Test adding link without authentication fails"""
     response = await client.post(
-        "/api/links?category_name=Test",
+        "/api/v1/links?category_name=Test",
         json={"title": "Test", "url": "https://test.com"}
     )
     assert response.status_code == 401
@@ -23,7 +23,7 @@ async def test_add_link_unauthenticated(client):
 async def test_add_link_authenticated(client, auth_headers):
     """Test adding link with authentication"""
     response = await client.post(
-        "/api/links?category_name=Test",
+        "/api/v1/links?category_name=Test",
         json={"title": "Test Link", "url": "https://test.com"},
         headers=auth_headers
     )

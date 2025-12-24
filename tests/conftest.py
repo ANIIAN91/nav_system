@@ -1,12 +1,16 @@
 """Pytest configuration and fixtures"""
 import asyncio
+import os
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
+os.environ.setdefault("SECRET_KEY", "test-secret-key-32-chars-minimum-123456")
+os.environ.setdefault("ADMIN_USERNAME", "admin")
+os.environ.setdefault("ADMIN_PASSWORD", "admin123")
+
 from app.database import Base, get_db
-from app.main import app
 from app.config import get_settings
 
 settings = get_settings()
@@ -41,6 +45,8 @@ async def test_db():
 @pytest_asyncio.fixture
 async def client(test_db):
     """Create test client"""
+    from app.main import app
+
     async def override_get_db():
         yield test_db
 

@@ -102,7 +102,7 @@ class LinkService:
                     return True
         return False
 
-    async def add_link(self, category_name: str, title: str, url: str, icon: Optional[str] = None) -> dict:
+    async def add_link(self, category_name: str, title: str, url: str, icon: Optional[str] = None, link_id: Optional[str] = None) -> dict:
         """Add a link to a category"""
         category = await self.get_category_by_name(category_name)
         if not category:
@@ -110,7 +110,7 @@ class LinkService:
 
         max_order = await self._get_max_link_order(category.id)
         link = Link(
-            id=uuid.uuid4(),
+            id=link_id if link_id else str(uuid.uuid4()),
             category_id=category.id,
             title=title,
             url=url,

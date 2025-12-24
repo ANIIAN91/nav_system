@@ -6,7 +6,7 @@
 const { Plugin, PluginSettingTab, Setting, Notice, requestUrl } = require('obsidian');
 
 const DEFAULT_SETTINGS = {
-    apiUrl: 'http://localhost:8000',
+    apiUrl: 'http://localhost:8001',
     jwtToken: '',
     defaultPath: 'notes',
     syncOnSave: false
@@ -210,7 +210,7 @@ class NavSystemSyncPlugin extends Plugin {
 
             // 发送请求
             const response = await requestUrl({
-                url: `${this.settings.apiUrl}/api/articles/sync`,
+                url: `${this.settings.apiUrl}/api/v1/articles/sync`,
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -379,7 +379,7 @@ class NavSystemSyncSettingTab extends PluginSettingTab {
                 .onClick(async () => {
                     try {
                         const response = await requestUrl({
-                            url: `${this.plugin.settings.apiUrl}/api/auth/me`,
+                            url: `${this.plugin.settings.apiUrl}/api/v1/auth/me`,
                             method: 'GET',
                             headers: {
                                 'Authorization': `Bearer ${this.plugin.settings.jwtToken}`

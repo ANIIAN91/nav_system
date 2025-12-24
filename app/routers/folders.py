@@ -9,7 +9,7 @@ from app.schemas.setting import FolderRenameRequest
 from app.services.log import LogService
 from app.routers.auth import require_auth
 
-router = APIRouter(prefix="/api/folders", tags=["folders"])
+router = APIRouter(prefix="/api/v1/folders", tags=["folders"])
 settings = get_settings()
 
 @router.get("")
@@ -46,6 +46,7 @@ async def create_folder(
 
     log_service = LogService(db)
     await log_service.record_update("add", "folder", safe_name, "", username)
+    await db.commit()
 
     return {"message": "目录创建成功", "name": safe_name}
 
@@ -76,6 +77,7 @@ async def rename_folder(
 
     log_service = LogService(db)
     await log_service.record_update("update", "folder", name, f"重命名为: {safe_new_name}", username)
+    await db.commit()
 
     return {"message": "目录重命名成功", "old_name": name, "new_name": safe_new_name}
 
@@ -98,5 +100,6 @@ async def delete_folder(
 
     log_service = LogService(db)
     await log_service.record_update("delete", "folder", name, f"包含 {article_count} 篇文章", username)
+    await db.commit()
 
     return {"message": "目录已删除"}

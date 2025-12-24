@@ -93,7 +93,7 @@ function updateUI() {
 // 加载导航链接
 async function loadLinks() {
     try {
-        const response = await api('/api/links');
+        const response = await api('/api/v1/links');
         state.links = await response.json();
         renderLinks();
     } catch (error) {
@@ -273,7 +273,7 @@ function updateCategorySelect() {
 // 登录
 async function login(username, password, rememberUsername, stayLoggedIn) {
     try {
-        const response = await fetch('/api/auth/login', {
+        const response = await fetch('/api/v1/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
@@ -354,7 +354,7 @@ function logout() {
 // 添加链接
 async function addLink(category, title, url, icon) {
     try {
-        const response = await api(`/api/links?category_name=${encodeURIComponent(category)}`, {
+        const response = await api(`/api/v1/links?category_name=${encodeURIComponent(category)}`, {
             method: 'POST',
             body: JSON.stringify({ title, url, icon: icon || null })
         });
@@ -374,7 +374,7 @@ async function addLink(category, title, url, icon) {
 // 更新链接
 async function updateLink(id, title, url, icon, category) {
     try {
-        const response = await api(`/api/links/${id}`, {
+        const response = await api(`/api/v1/links/${id}`, {
             method: 'PUT',
             body: JSON.stringify({ title, url, icon: icon || null, category: category || null })
         });
@@ -395,7 +395,7 @@ async function deleteLink(id) {
     if (!confirm('确定要删除这个链接吗？')) return;
 
     try {
-        const response = await api(`/api/links/${id}`, {
+        const response = await api(`/api/v1/links/${id}`, {
             method: 'DELETE'
         });
 
@@ -413,7 +413,7 @@ async function deleteLink(id) {
 // 添加分类
 async function addCategory(name, authRequired) {
     try {
-        const response = await api('/api/categories', {
+        const response = await api('/api/v1/categories', {
             method: 'POST',
             body: JSON.stringify({ name, auth_required: authRequired, links: [] })
         });
@@ -436,7 +436,7 @@ async function deleteCategory(name) {
     if (!confirm(`确定要删除分类 "${name}" 及其所有链接吗？`)) return;
 
     try {
-        const response = await api(`/api/categories/${encodeURIComponent(name)}`, {
+        const response = await api(`/api/v1/categories/${encodeURIComponent(name)}`, {
             method: 'DELETE'
         });
 
@@ -505,7 +505,7 @@ async function fetchFaviconGeneric(url, iconInputId, statusElId) {
         statusEl.textContent = '正在获取图标...';
         statusEl.style.color = 'var(--text-muted)';
 
-        const response = await api('/api/fetch-favicon', {
+        const response = await api('/api/v1/favicon/fetch', {
             method: 'POST',
             body: JSON.stringify({ url })
         });
@@ -532,7 +532,7 @@ async function fetchFaviconGeneric(url, iconInputId, statusElId) {
 // 更新分类
 async function updateCategory(oldName, newName, authRequired) {
     try {
-        const response = await api(`/api/categories/${encodeURIComponent(oldName)}`, {
+        const response = await api(`/api/v1/categories/${encodeURIComponent(oldName)}`, {
             method: 'PUT',
             body: JSON.stringify({ name: newName, auth_required: authRequired })
         });
@@ -560,7 +560,7 @@ function openEditCategoryModal(name, authRequired) {
 // 调整分类顺序
 async function reorderCategory(name, direction) {
     try {
-        const response = await api(`/api/categories/${encodeURIComponent(name)}/reorder`, {
+        const response = await api(`/api/v1/categories/${encodeURIComponent(name)}/reorder`, {
             method: 'POST',
             body: JSON.stringify({ direction })
         });
@@ -574,7 +574,7 @@ async function reorderCategory(name, direction) {
 // 调整链接顺序
 async function reorderLink(id, direction) {
     try {
-        const response = await api(`/api/links/${id}/reorder`, {
+        const response = await api(`/api/v1/links/${id}/reorder`, {
             method: 'POST',
             body: JSON.stringify({ direction })
         });
@@ -588,7 +588,7 @@ async function reorderLink(id, direction) {
 // 加载站点设置
 async function loadSettings() {
     try {
-        const response = await fetch('/api/settings');
+        const response = await fetch('/api/v1/settings');
         const settings = await response.json();
 
         // 保存到状态
@@ -623,7 +623,7 @@ async function loadSettings() {
 // 保存站点设置
 async function saveSettings(icp, copyright, articlePageTitle, siteTitle, linkSize, protectedPaths, analyticsCode) {
     try {
-        const response = await api('/api/settings', {
+        const response = await api('/api/v1/settings', {
             method: 'PUT',
             body: JSON.stringify({
                 icp,
@@ -833,7 +833,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 导出导航数据
     document.getElementById('export-links-btn')?.addEventListener('click', async () => {
         try {
-            const response = await api('/api/links/export');
+            const response = await api('/api/v1/links/export');
             if (!response.ok) throw new Error('导出失败');
             const data = await response.json();
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -881,7 +881,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // 加载访问记录
 async function loadVisits() {
     try {
-        const response = await api('/api/visits?limit=200');
+        const response = await api('/api/v1/logs/visits?limit=200');
         if (!response.ok) {
             throw new Error('加载失败');
         }
@@ -920,7 +920,7 @@ async function clearVisits() {
     if (!confirm('确定要清空所有访问记录吗？')) return;
 
     try {
-        const response = await api('/api/visits', { method: 'DELETE' });
+        const response = await api('/api/v1/logs/visits', { method: 'DELETE' });
         if (!response.ok) {
             throw new Error('清空失败');
         }
@@ -934,7 +934,7 @@ async function clearVisits() {
 // 加载更新记录
 async function loadUpdates() {
     try {
-        const response = await api('/api/updates?limit=200');
+        const response = await api('/api/v1/logs/updates?limit=200');
         if (!response.ok) {
             throw new Error('加载失败');
         }
@@ -978,7 +978,7 @@ async function clearUpdates() {
     if (!confirm('确定要清空所有更新记录吗？')) return;
 
     try {
-        const response = await api('/api/updates', { method: 'DELETE' });
+        const response = await api('/api/v1/logs/updates', { method: 'DELETE' });
         if (!response.ok) {
             throw new Error('清空失败');
         }
@@ -1008,7 +1008,7 @@ async function importLinks(format) {
         const text = await file.text();
         const data = JSON.parse(text);
 
-        const response = await api('/api/links/import', {
+        const response = await api('/api/v1/links/import', {
             method: 'POST',
             body: JSON.stringify({ data, format })
         });

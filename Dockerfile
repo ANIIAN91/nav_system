@@ -28,7 +28,7 @@ COPY scripts/ scripts/
 RUN mkdir -p /app/data /app/articles /app/static/icons /app/data/backups
 
 # 环境变量说明（运行时必须设置）
-# DATABASE_URL - PostgreSQL 连接字符串
+# DATABASE_URL - 数据库连接字符串（可选，默认使用 SQLite）
 # SECRET_KEY - JWT 密钥
 # ADMIN_USERNAME - 管理员用户名
 # ADMIN_PASSWORD - 明文密码（启动时自动哈希）

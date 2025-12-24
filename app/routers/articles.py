@@ -14,7 +14,7 @@ from app.services.log import LogService
 from app.routers.auth import get_current_user, require_auth
 from app.routers.settings import get_site_settings
 
-router = APIRouter(prefix="/api/articles", tags=["articles"])
+router = APIRouter(prefix="/api/v1/articles", tags=["articles"])
 settings = get_settings()
 
 def is_path_protected(path: str, protected_paths: List[str]) -> bool:
@@ -136,6 +136,7 @@ async def update_article(
 
     log_service = LogService(db)
     await log_service.record_update("update", "article", article_path.stem, f"路径: {path}", username)
+    await db.commit()
 
     return {"message": "文章已更新", "path": path}
 
@@ -158,5 +159,6 @@ async def delete_article(
 
     log_service = LogService(db)
     await log_service.record_update("delete", "article", article_name, f"路径: {path}", username)
+    await db.commit()
 
     return {"message": "文章已删除"}

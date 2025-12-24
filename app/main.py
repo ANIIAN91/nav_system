@@ -1,5 +1,4 @@
 """Nav System - FastAPI Application"""
-import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -22,27 +21,15 @@ from app.routers.settings import get_site_settings
 
 settings = get_settings()
 
-# Validate security config on startup
-auth_service = AuthService()
-security_errors = auth_service.validate_config()
-if security_errors:
-    print("=" * 60)
-    print("安全配置错误 - 服务无法启动")
-    print("=" * 60)
-    for err in security_errors:
-        print(f"  - {err}")
-    print()
-    print("请设置以下环境变量：")
-    print("  export SECRET_KEY='your-random-secret-key'")
-    print("  export ADMIN_USERNAME='your-username'")
-    print("  export ADMIN_PASSWORD='your-password'")
-    print("=" * 60)
-    sys.exit(1)
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
+    auth_service = AuthService()
+    security_errors = auth_service.validate_config()
+    if security_errors:
+        msg = "安全配置错误，服务无法启动:\n" + "\n".join(f"- {e}" for e in security_errors)
+        raise RuntimeError(msg)
     await init_db()
     yield
     # Shutdown

@@ -26,4 +26,4 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: aniian/nav-system:v3.2,aniian/nav-system:latest
+          tags: aniian/nav-system:v3.3,aniian/nav-system:latest

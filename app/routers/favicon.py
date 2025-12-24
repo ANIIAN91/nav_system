@@ -5,9 +5,9 @@ from app.schemas.link import FaviconRequest
 from app.utils.favicon import fetch_favicon
 from app.routers.auth import require_auth
 
-router = APIRouter(prefix="/api", tags=["favicon"])
+router = APIRouter(prefix="/api/v1/favicon", tags=["favicon"])
 
-@router.post("/fetch-favicon")
+@router.post("/fetch")
 async def get_favicon(
     request: FaviconRequest,
     username: str = Depends(require_auth)

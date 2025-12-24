@@ -5,7 +5,7 @@ import pytest
 async def test_add_category_unauthenticated(client):
     """Test adding category without authentication fails"""
     response = await client.post(
-        "/api/categories",
+        "/api/v1/categories",
         json={"name": "Test Category", "auth_required": False}
     )
     assert response.status_code == 401
@@ -14,7 +14,7 @@ async def test_add_category_unauthenticated(client):
 async def test_add_category_authenticated(client, auth_headers):
     """Test adding category with authentication"""
     response = await client.post(
-        "/api/categories",
+        "/api/v1/categories",
         json={"name": "Test Category", "auth_required": False},
         headers=auth_headers
     )
@@ -28,13 +28,13 @@ async def test_add_duplicate_category(client, auth_headers):
     """Test adding duplicate category fails"""
     # Add first category
     await client.post(
-        "/api/categories",
+        "/api/v1/categories",
         json={"name": "Duplicate", "auth_required": False},
         headers=auth_headers
     )
     # Try to add duplicate
     response = await client.post(
-        "/api/categories",
+        "/api/v1/categories",
         json={"name": "Duplicate", "auth_required": False},
         headers=auth_headers
     )

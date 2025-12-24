@@ -10,7 +10,7 @@ from app.services.log import LogService
 from app.routers.auth import get_current_user, require_auth
 from app.utils.favicon import fetch_favicon
 
-router = APIRouter(prefix="/api/links", tags=["links"])
+router = APIRouter(prefix="/api/v1/links", tags=["links"])
 
 @router.get("")
 async def get_links(
@@ -34,6 +34,7 @@ async def add_link(
 
     result = await service.add_link(category_name, link.title, link.url, link.icon)
     await log_service.record_update("add", "link", link.title, f"分类: {category_name}, URL: {link.url}", username)
+    await db.commit()
 
     return {"message": "添加成功", "link": result}
 
@@ -53,6 +54,7 @@ async def update_link(
         raise HTTPException(status_code=404, detail="链接不存在")
 
     await log_service.record_update("update", "link", link.title, f"URL: {link.url}", username)
+    await db.commit()
     return {"message": "修改成功", "link": result}
 
 @router.delete("/{link_id}")
@@ -72,6 +74,7 @@ async def delete_link(
     link_title = link.title
     await service.delete_link(link_id)
     await log_service.record_update("delete", "link", link_title, "", username)
+    await db.commit()
 
     return {"message": "删除成功"}
 
@@ -87,6 +90,7 @@ async def reorder_link(
     success = await service.reorder_link(link_id, request.direction)
     if not success:
         return {"message": "无法移动"}
+    await db.commit()
     return {"message": "移动成功"}
 
 @router.get("/export")
@@ -131,6 +135,7 @@ async def import_links(
                         item.get("url", ""),
                         None
                     )
+            await db.commit()
             return {"message": f"导入成功，共 {len(icons)} 个分类"}
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"SunPanel 格式解析失败: {str(e)}")
@@ -154,8 +159,10 @@ async def import_links(
                         cat_data["name"],
                         link_data.get("title", ""),
                         link_data.get("url", ""),
-                        link_data.get("icon")
+                        link_data.get("icon"),
+                        link_data.get("id")
                     )
+            await db.commit()
             return {"message": "导入成功"}
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"导入失败: {str(e)}")

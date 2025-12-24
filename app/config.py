@@ -8,21 +8,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def build_database_url() -> str:
-    """Build database URL with properly encoded password"""
+    """Build database URL for SQLite"""
     url = os.getenv("DATABASE_URL", "")
     if url:
         return url
 
-    # Build from individual components if DATABASE_URL not set
-    db_user = os.getenv("DB_USER", "postgres")
-    db_password = os.getenv("DB_PASSWORD", "password")
-    db_host = os.getenv("DB_HOST", "localhost")
-    db_port = os.getenv("DB_PORT", "5432")
-    db_name = os.getenv("DB_NAME", "postgres")
-
-    # URL encode password to handle special characters like @, !, #, etc.
-    encoded_password = quote_plus(db_password)
-    return f"postgresql+asyncpg://{db_user}:{encoded_password}@{db_host}:{db_port}/{db_name}"
+    # Default SQLite database in data directory
+    base_dir = Path(__file__).parent.parent
+    data_dir = base_dir / "data"
+    data_dir.mkdir(exist_ok=True)
+    db_path = data_dir / "nav_system.db"
+    return f"sqlite+aiosqlite:///{db_path}"
 
 class Settings:
     """Application settings loaded from environment variables"""

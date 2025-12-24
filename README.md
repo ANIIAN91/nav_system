@@ -2,7 +2,7 @@
 
 [Demo](https://navsystem-navsystem.up.railway.app/) | 预览账号: `admin` / `admin123`
 
-基于 FastAPI + PostgreSQL 的个人主页系统，集成导航站和 Markdown 文章展示功能。采用 **Zen-iOS Hybrid** 设计语言，提供极致的毛玻璃效果和物理触感。
+基于 FastAPI + SQLite 的个人主页系统，集成导航站和 Markdown 文章展示功能。采用 **Zen-iOS Hybrid** 设计语言，提供极致的毛玻璃效果和物理触感。
 
 ## ✨ 功能特性
 
@@ -40,12 +40,8 @@ nano .env
 
 `.env` 配置示例：
 ```env
-# 数据库配置
-DB_USER=postgres
-DB_PASSWORD=your_password
-DB_HOST=your_remote_db_host  # 远程数据库地址
-DB_PORT=5432
-DB_NAME=nav_system
+# 数据库配置（可选，默认使用 SQLite）
+# DATABASE_URL=sqlite+aiosqlite:///./data/nav_system.db
 
 # 安全配置
 SECRET_KEY=your-random-32-character-secret-key
@@ -67,6 +63,10 @@ docker compose down
 ```
 
 访问 `http://localhost:8001`
+
+### API 前缀
+
+本项目 API 统一使用 `/api/v1` 前缀（例如：`/api/v1/links`、`/api/v1/auth/login`）。
 
 ### 方式二：Docker Run（使用预构建镜像）
 
@@ -146,44 +146,36 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 
 ```bash
 docker run -d \
-  -e DB_HOST=your_db_host \
-  -e DB_PASSWORD=your_password \
   -e SECRET_KEY=your_secret \
   -e ADMIN_USERNAME=admin \
   -e ADMIN_PASSWORD=admin123 \
   ...
 ```
 
-## 🗄️ 数据库配置
+## 🗄️ 数据库说明
 
-### PostgreSQL（推荐）
+本项目使用 **SQLite** 作为数据库，具有以下优势：
 
-**使用远程数据库：**
+- ✅ **零配置**：无需安装和配置外部数据库服务
+- ✅ **单文件存储**：数据库文件位于 `data/nav_system.db`
+- ✅ **易于备份**：直接复制 `.db` 文件即可完成备份
+- ✅ **轻量高效**：适合个人使用场景，性能优异
+
+### 数据持久化
+
+确保挂载 `data` 目录以持久化数据库：
+
+```bash
+-v $(pwd)/data:/app/data
+```
+
+### 自定义数据库路径（可选）
+
+如需使用其他数据库或自定义路径，可通过环境变量指定：
+
 ```env
-DB_HOST=your_remote_db_host
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=your_password
-DB_NAME=nav_system
-```
-
-**使用本地 PostgreSQL：**
-```bash
-# 安装 PostgreSQL
-sudo apt install postgresql postgresql-contrib
-
-# 创建数据库
-sudo -u postgres psql -c "CREATE DATABASE nav_system;"
-sudo -u postgres psql -c "CREATE USER postgres WITH PASSWORD 'your_password';"
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE nav_system TO postgres;"
-```
-
-### 数据迁移
-
-如果有旧版 JSON 数据需要迁移到 PostgreSQL：
-
-```bash
-python scripts/migrate_data.py
+# 使用自定义 SQLite 路径
+DATABASE_URL=sqlite+aiosqlite:///./custom/path/database.db
 ```
 
 ## 🌐 生产部署
@@ -211,14 +203,69 @@ server {
 
 ## 🔌 Obsidian 插件
 
-**安装：**
-1. 将 `obsidian-plugin/` 复制到 `.obsidian/plugins/nav-system-sync/`
-2. 在 Obsidian 设置中启用插件
-3. 配置 API 地址和 JWT Token
+Nav System 提供 Obsidian 插件，可以将 Obsidian 笔记同步到导航系统的文章模块。
 
-**使用：**
-- 右键文件 → "上传到 Nav System"
+### 安装步骤
+
+1. **复制插件文件**
+   ```bash
+   # 在 Obsidian vault 目录下
+   mkdir -p .obsidian/plugins/nav-system-sync
+   cp -r /path/to/nav_system/obsidian-plugin/* .obsidian/plugins/nav-system-sync/
+   ```
+
+2. **启用插件**
+   - 打开 Obsidian 设置
+   - 进入"第三方插件"
+   - 关闭"安全模式"
+   - 在"已安装插件"中找到"Nav System Sync"
+   - 点击启用
+
+3. **配置插件**
+   - 在插件设置中配置以下信息：
+     - **API 地址**：你的 Nav System 地址（如 `https://your-domain.com` 或 `http://localhost:8001`）
+     - **JWT Token**：从管理界面获取（见下方说明）
+     - **默认路径**：文章保存的默认路径（默认 `notes`）
+     - **自动同步**：保存时自动上传（可选）
+
+### 获取 JWT Token
+
+1. 登录 Nav System 管理界面
+2. 进入"导入导出"标签页
+3. 在"API Token"部分，复制显示的 Token
+4. 将 Token 粘贴到 Obsidian 插件设置中
+
+### 功能说明
+
+**命令面板：**
+- `上传当前文件到 Nav System`：上传当前打开的文件
+- `上传当前文件（指定路径）`：上传并自定义保存路径
+
+**右键菜单：**
+- 右键 Markdown 文件 → "上传到 Nav System"
 - 右键文件夹 → "上传文件夹到 Nav System"
+
+**编辑器菜单：**
+- 在编辑器中右键 → "上传到 Nav System"
+
+**自动同步：**
+- 启用后，保存文件时自动上传到 Nav System
+
+**状态栏：**
+- 显示"Nav Sync"图标，表示插件已启用
+
+### 使用方法
+
+**上传单个文件：**
+1. 打开要上传的 Markdown 文件
+2. 按 `Ctrl/Cmd + P` 打开命令面板
+3. 输入"上传当前文件"并执行
+4. 或者右键文件 → "上传到 Nav System"
+
+**上传整个文件夹：**
+1. 在文件列表中右键文件夹
+2. 选择"上传文件夹到 Nav System"
+3. 插件会递归上传所有 Markdown 文件
 
 **批量同步脚本：**
 ```bash
@@ -228,64 +275,72 @@ python scripts/sync_articles.py \
   --token YOUR_JWT_TOKEN
 ```
 
+### 注意事项
+
+- 上传的文件会保存到 `articles/` 目录
+- 文件路径结构会保持与 Obsidian vault 中一致
+- 支持中文文件名和路径
+- 图片等附件需要单独处理（暂不支持自动上传）
+
 ## 📡 API 接口
 
 ### 认证
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/auth/login` | 登录 |
-| POST | `/api/auth/logout` | 登出 |
-| GET | `/api/auth/me` | 当前用户信息 |
+| POST | `/api/v1/auth/login` | 登录 |
+| POST | `/api/v1/auth/logout` | 登出 |
+| GET | `/api/v1/auth/me` | 当前用户信息 |
 
 ### 导航链接
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
-| GET | `/api/links` | 获取链接列表 | 否 |
-| POST | `/api/links` | 添加链接 | 是 |
-| PUT | `/api/links/{id}` | 修改链接 | 是 |
-| DELETE | `/api/links/{id}` | 删除链接 | 是 |
+| GET | `/api/v1/links` | 获取链接列表 | 否 |
+| POST | `/api/v1/links` | 添加链接 | 是 |
+| PUT | `/api/v1/links/{id}` | 修改链接 | 是 |
+| DELETE | `/api/v1/links/{id}` | 删除链接 | 是 |
 
 ### 分类
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
-| POST | `/api/categories` | 添加分类 | 是 |
-| PUT | `/api/categories/{name}` | 修改分类 | 是 |
-| DELETE | `/api/categories/{name}` | 删除分类 | 是 |
+| POST | `/api/v1/categories` | 添加分类 | 是 |
+| PUT | `/api/v1/categories/{name}` | 修改分类 | 是 |
+| DELETE | `/api/v1/categories/{name}` | 删除分类 | 是 |
 
 ### 文章
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
-| GET | `/api/articles` | 文章列表 | 否 |
-| GET | `/api/articles/{path}` | 文章内容 | 否* |
-| POST | `/api/articles/sync` | 同步文章 | 是 |
-| PUT | `/api/articles/{path}` | 编辑文章 | 是 |
-| DELETE | `/api/articles/{path}` | 删除文章 | 是 |
+| GET | `/api/v1/articles` | 文章列表 | 否 |
+| GET | `/api/v1/articles/{path}` | 文章内容 | 否* |
+| POST | `/api/v1/articles/sync` | 同步文章 | 是 |
+| PUT | `/api/v1/articles/{path}` | 编辑文章 | 是 |
+| DELETE | `/api/v1/articles/{path}` | 删除文章 | 是 |
 
 > *受保护目录下的文章需要登录
 
 ### 目录管理
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
-| GET | `/api/folders` | 目录列表 | 是 |
-| POST | `/api/folders?name={name}` | 创建目录 | 是 |
-| PUT | `/api/folders/{name}` | 重命名目录 | 是 |
-| DELETE | `/api/folders/{name}` | 删除目录 | 是 |
+| GET | `/api/v1/folders` | 目录列表 | 是 |
+| POST | `/api/v1/folders?name={name}` | 创建目录 | 是 |
+| PUT | `/api/v1/folders/{name}` | 重命名目录 | 是 |
+| DELETE | `/api/v1/folders/{name}` | 删除目录 | 是 |
 
 ### 设置与日志
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
-| GET | `/api/settings` | 获取设置 | 否 |
-| PUT | `/api/settings` | 更新设置 | 是 |
-| GET | `/api/visits` | 访问记录 | 是 |
-| GET | `/api/updates` | 更新记录 | 是 |
+| GET | `/api/v1/settings` | 获取设置 | 否 |
+| PUT | `/api/v1/settings` | 更新设置 | 是 |
+| GET | `/api/v1/logs/visits` | 访问记录 | 是 |
+| GET | `/api/v1/logs/updates` | 更新记录 | 是 |
 
 ## 🛠️ 技术栈
 
 - **后端**: Python FastAPI
-- **数据库**: PostgreSQL + SQLAlchemy (async)
+- **数据库**: SQLite + SQLAlchemy (async)
 - **认证**: JWT Token
 - **前端**: HTML + CSS + JavaScript + Jinja2
 - **设计**: Zen-iOS Hybrid（毛玻璃效果 + 物理触感）
+- **部署**: Docker + Docker Compose
 
 ## 📁 项目结构
 
@@ -306,7 +361,7 @@ nav_system/
 │   ├── js/main.js           # 前端逻辑
 │   └── icons/               # 网站图标
 ├── articles/                # Markdown 文章
-├── data/                    # JSON 数据（旧版兼容）
+├── data/                    # SQLite 数据库文件
 ├── scripts/                 # 工具脚本
 ├── alembic/                 # 数据库迁移
 ├── tests/                   # 测试
@@ -319,11 +374,11 @@ nav_system/
 
 ## ⚠️ 注意事项
 
-- 数据库密码中的特殊字符需要 URL 编码（如 `@` → `%40`）
 - 生产环境建议使用 Nginx 反向代理并启用 HTTPS
-- 定期备份数据库和 `articles/` 目录
+- 定期备份 `data/nav_system.db` 数据库文件和 `articles/` 目录
 - `SECRET_KEY` 必须是随机生成的 32 字符以上字符串
 - 首次启动会自动创建数据库表结构
+- Docker 部署时确保挂载 `data` 目录以持久化数据
 
 ## 📄 License
 

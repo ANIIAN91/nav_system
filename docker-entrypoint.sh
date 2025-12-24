@@ -21,8 +21,12 @@ fi
 
 # Run database migrations if needed (optional)
 if [ "$RUN_MIGRATIONS" = "true" ]; then
-    echo "Running database migrations..."
-    python scripts/migrate_data.py
+    if [ -d "/app/alembic/versions" ] && [ "$(ls -1 /app/alembic/versions/*.py 2>/dev/null | wc -l)" -gt 0 ]; then
+        echo "Running database migrations (alembic upgrade head)..."
+        alembic upgrade head
+    else
+        echo "RUN_MIGRATIONS=true but no Alembic revisions found; skipping migrations."
+    fi
 fi
 
 # Execute the main command

@@ -7,7 +7,7 @@ from app.schemas.auth import LoginRequest, TokenResponse
 from app.services.auth import AuthService
 from app.utils.security import verify_token
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 security = HTTPBearer(auto_error=False)
 
 async def get_current_user(

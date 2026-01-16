@@ -33,6 +33,9 @@ class LinksData(BaseModel):
 class ReorderRequest(BaseModel):
     direction: str  # up or down
 
+class BatchReorderRequest(BaseModel):
+    ids: List[str]  # List of link IDs or category names in new order
+
 class FaviconRequest(BaseModel):
     url: str
 

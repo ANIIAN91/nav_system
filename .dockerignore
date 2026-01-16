@@ -6,6 +6,20 @@ __pycache__/
 .Python
 *.so
 
+# Python tooling caches
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.pyre/
+.hypothesis/
+.cache/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+
 # Git
 .git/
 .gitignore
@@ -15,6 +29,16 @@ __pycache__/
 .env
 .env.*
 *.env
+.envrc
+
+# Keys / certificates (NEVER include in image)
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+*.keystore
+secrets/
 
 # Documentation (except README for reference)
 *.md
@@ -31,16 +55,29 @@ static/icons/
 
 # Development files
 *.log
+*.log.*
+*.pid
 *.tmp
 *.bak
 .pytest_cache/
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
 tests/
 venv/
 .venv/
 .idea/
 .vscode/
+
+# Jupyter / notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Local databases
+*.sqlite
+*.sqlite3
+*.db
 
 # Build scripts
 init.sh

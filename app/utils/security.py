@@ -2,6 +2,7 @@
 import time
 import socket
 import ipaddress
+import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
 from collections import defaultdict
@@ -9,6 +10,8 @@ from urllib.parse import urlparse
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.config import get_settings
 
@@ -27,17 +30,37 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """Create a JWT access token"""
+    """Create a JWT access token with jti (JWT ID)"""
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
-    to_encode.update({"exp": expire})
+
+    # 添加 jti（JWT ID）用于撤销
+    jti = str(uuid.uuid4())
+    to_encode.update({
+        "exp": expire,
+        "jti": jti,
+        "iat": datetime.utcnow()  # 签发时间
+    })
+
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
 
-def verify_token(token: str) -> Optional[str]:
-    """Verify a JWT token and return the username"""
+async def verify_token(token: str, db: AsyncSession) -> Optional[str]:
+    """Verify a JWT token and check blacklist"""
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
         username: str = payload.get("sub")
+        jti: str = payload.get("jti")
+
+        # 检查 token 是否在黑名单中
+        if jti:
+            # Import here to avoid circular dependency
+            from app.models.token_blacklist import TokenBlacklist
+            result = await db.execute(
+                select(TokenBlacklist).where(TokenBlacklist.jti == jti)
+            )
+            if result.scalar_one_or_none():
+                return None  # Token 已被撤销
+
         return username
     except JWTError:
         return None
@@ -90,6 +113,11 @@ def is_safe_url(url: str) -> Tuple[bool, str]:
             for addr_info in ip_addresses:
                 ip_str = addr_info[4][0]
                 ip = ipaddress.ip_address(ip_str)
+
+                # Allow 198.18.0.0/15 (benchmark testing range, often used by proxies)
+                if ip_str.startswith('198.18.') or ip_str.startswith('198.19.'):
+                    continue
+
                 if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
                     return False, f"禁止访问内部/私有 IP 地址: {ip_str}"
         except socket.gaierror:

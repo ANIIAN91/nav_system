@@ -10,6 +10,8 @@ class SiteSettings(BaseModel):
     link_size: Optional[str] = "medium"
     protected_article_paths: Optional[List[str]] = []
     analytics_code: Optional[str] = ""
+    github_url: Optional[str] = "https://github.com/ANIIAN91/nav_system"
+    timezone: Optional[str] = "Asia/Shanghai"
 
 class ArticleSyncRequest(BaseModel):
     path: str

@@ -2,6 +2,7 @@
 from pathlib import Path
 from typing import Optional, List
 
+import bleach
 import markdown
 import yaml
 from fastapi import APIRouter, HTTPException, Depends
@@ -83,7 +84,16 @@ async def get_article(
         content,
         extensions=["fenced_code", "tables", "toc", "codehilite", "nl2br", "sane_lists"]
     )
-    return {"path": path, "content": content, "html": html_content}
+
+    # Sanitize HTML to prevent XSS attacks
+    clean_html = bleach.clean(
+        html_content,
+        tags=['p', 'a', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'hr', 'br', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'div', 'span'],
+        attributes={'a': ['href', 'title'], 'img': ['src', 'alt'], 'code': ['class'], 'pre': ['class'], 'div': ['class'], 'span': ['class']},
+        strip=True
+    )
+
+    return {"path": path, "content": content, "html": clean_html}
 
 @router.post("/sync")
 async def sync_article(

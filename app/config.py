@@ -7,6 +7,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Application version
+VERSION = "1.0.0"
+GITHUB_URL = "https://github.com/ANIIAN91/nav_system"
+
 def build_database_url() -> str:
     """Build database URL for SQLite"""
     url = os.getenv("DATABASE_URL", "")
@@ -33,7 +37,7 @@ class Settings:
         self.admin_password: str = os.getenv("ADMIN_PASSWORD", "")
         self.admin_password_hash: str = os.getenv("ADMIN_PASSWORD_HASH", "")
         self.algorithm: str = "HS256"
-        self.access_token_expire_minutes: int = 60 * 24  # 24 hours
+        self.access_token_expire_minutes: int = 60  # 60 minutes - Improved security
 
         # Rate limiting
         self.max_login_attempts: int = 5

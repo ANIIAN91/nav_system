@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.schemas.category import CategoryCreate, CategoryUpdate
-from app.schemas.link import ReorderRequest
+from app.schemas.link import BatchReorderRequest
 from app.services.link import LinkService
 from app.services.log import LogService
 from app.routers.auth import require_auth
@@ -78,17 +78,16 @@ async def delete_category(
     await db.commit()
     return {"message": "删除成功"}
 
-@router.post("/{category_name}/reorder")
-async def reorder_category(
-    category_name: str,
-    request: ReorderRequest,
+@router.post("/reorder/batch")
+async def batch_reorder_categories(
+    request: BatchReorderRequest,
     username: str = Depends(require_auth),
     db: AsyncSession = Depends(get_db)
 ):
-    """Reorder a category"""
+    """Batch reorder categories"""
     service = LinkService(db)
-    success = await service.reorder_category(category_name, request.direction)
+    success = await service.batch_reorder_categories(request.ids)
     if not success:
-        return {"message": "无法移动"}
+        raise HTTPException(status_code=400, detail="批量排序失败")
     await db.commit()
-    return {"message": "移动成功"}
+    return {"message": "排序成功"}

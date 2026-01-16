@@ -25,22 +25,47 @@
 
         <!-- 导航内容 -->
         <main class="main-content">
-            <div id="links-container" class="links-container"></div>
+            <!-- 分类导航栏 -->
+            <nav id="category-nav" class="category-nav">
+                <div class="category-nav-container">
+                    <!-- 骨架屏 -->
+                    <div class="skeleton-nav">
+                        <div class="skeleton-category"></div>
+                        <div class="skeleton-category"></div>
+                        <div class="skeleton-category"></div>
+                        <div class="skeleton-category"></div>
+                    </div>
+                    <!-- 分类按钮将由 JavaScript 动态生成 -->
+                </div>
+            </nav>
+
+            <div id="links-container" class="links-container">
+                <!-- 骨架屏 -->
+                <div class="skeleton-links">
+                    <div class="skeleton-link"></div>
+                    <div class="skeleton-link"></div>
+                    <div class="skeleton-link"></div>
+                    <div class="skeleton-link"></div>
+                    <div class="skeleton-link"></div>
+                    <div class="skeleton-link"></div>
+                </div>
+            </div>
         </main>
 
         <!-- 底部 -->
         <footer class="footer">
             <div id="footer-content">
                 <span id="icp-info"></span>
+                <span id="github-link"></span>
             </div>
         </footer>
     </div>
 
     <!-- 登录弹窗 -->
-    <div id="login-modal" class="modal">
+    <div id="login-modal" class="modal" role="dialog" aria-labelledby="login-modal-title" aria-modal="true">
         <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>登录</h2>
+            <button type="button" class="close" aria-label="关闭">&times;</button>
+            <h2 id="login-modal-title">登录</h2>
             <form id="login-form">
                 <div class="form-group">
                     <label for="username">用户名</label>
@@ -56,12 +81,6 @@
                         记住账号密码
                     </label>
                 </div>
-                <div class="form-group checkbox-group">
-                    <label>
-                        <input type="checkbox" id="stay-logged-in" name="stay_logged_in">
-                        保持登录状态
-                    </label>
-                </div>
                 <button type="submit" class="btn btn-primary">登录</button>
                 <p id="login-error" class="error"></p>
             </form>
@@ -69,10 +88,10 @@
     </div>
 
     <!-- 管理弹窗 -->
-    <div id="manage-modal" class="modal">
+    <div id="manage-modal" class="modal" role="dialog" aria-labelledby="manage-modal-title" aria-modal="true">
         <div class="modal-content modal-large">
-            <span class="close">&times;</span>
-            <h2>管理</h2>
+            <button type="button" class="close" aria-label="关闭">&times;</button>
+            <h2 id="manage-modal-title">管理</h2>
             <div class="manage-layout">
                 <div class="manage-tabs">
                     <button class="tab-btn active" data-tab="add-link">添加链接</button>
@@ -140,6 +159,33 @@
                         </select>
                     </div>
                     <div class="form-group">
+                        <label for="timezone">时区设置</label>
+                        <select id="timezone" name="timezone">
+                            <option value="Asia/Shanghai">中国 - 北京时间 (UTC+8)</option>
+                            <option value="Asia/Tokyo">日本 - 东京 (UTC+9)</option>
+                            <option value="Asia/Seoul">韩国 - 首尔 (UTC+9)</option>
+                            <option value="Asia/Hong_Kong">中国 - 香港 (UTC+8)</option>
+                            <option value="Asia/Taipei">中国 - 台北 (UTC+8)</option>
+                            <option value="Asia/Singapore">新加坡 (UTC+8)</option>
+                            <option value="Asia/Bangkok">泰国 - 曼谷 (UTC+7)</option>
+                            <option value="Asia/Dubai">阿联酋 - 迪拜 (UTC+4)</option>
+                            <option value="Europe/London">英国 - 伦敦 (UTC+0)</option>
+                            <option value="Europe/Paris">法国 - 巴黎 (UTC+1)</option>
+                            <option value="Europe/Berlin">德国 - 柏林 (UTC+1)</option>
+                            <option value="Europe/Moscow">俄罗斯 - 莫斯科 (UTC+3)</option>
+                            <option value="America/New_York">美国 - 纽约 (UTC-5)</option>
+                            <option value="America/Chicago">美国 - 芝加哥 (UTC-6)</option>
+                            <option value="America/Denver">美国 - 丹佛 (UTC-7)</option>
+                            <option value="America/Los_Angeles">美国 - 洛杉矶 (UTC-8)</option>
+                            <option value="America/Toronto">加拿大 - 多伦多 (UTC-5)</option>
+                            <option value="America/Vancouver">加拿大 - 温哥华 (UTC-8)</option>
+                            <option value="Australia/Sydney">澳大利亚 - 悉尼 (UTC+10)</option>
+                            <option value="Australia/Melbourne">澳大利亚 - 墨尔本 (UTC+10)</option>
+                            <option value="Pacific/Auckland">新西兰 - 奥克兰 (UTC+12)</option>
+                        </select>
+                        <small style="color: var(--text-muted);">设置页面顶部时钟显示的时区</small>
+                    </div>
+                    <div class="form-group">
                         <label for="protected-paths">受保护的文章目录（需登录查看）</label>
                         <input type="text" id="protected-paths" name="protected_article_paths" placeholder="多个目录用逗号分隔，如: private,notes/secret">
                         <small style="color: var(--text-muted);">输入目录名，该目录下的文章需要登录后才能查看</small>
@@ -151,6 +197,11 @@
                     <div class="form-group">
                         <label for="footer-copyright">版权信息</label>
                         <input type="text" id="footer-copyright" name="copyright" placeholder="例如: © 2024 Your Name">
+                    </div>
+                    <div class="form-group">
+                        <label for="github-url">GitHub 仓库地址</label>
+                        <input type="text" id="github-url" name="github_url" placeholder="例如: https://github.com/ANIIAN91/nav_system">
+                        <small style="color: var(--text-muted);">页脚显示的 GitHub 仓库链接</small>
                     </div>
                     <div class="form-group">
                         <label for="analytics-code">统计分析代码</label>
@@ -180,6 +231,7 @@
                     <label>API Token（用于 Obsidian 插件或脚本同步）</label>
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <input type="text" id="jwt-token-display" readonly style="flex: 1; font-family: monospace; font-size: 12px;">
+                        <button type="button" id="toggle-token-btn" class="btn btn-secondary">显示 Token</button>
                         <button type="button" id="copy-token-btn" class="btn btn-secondary">复制</button>
                     </div>
                     <small style="color: var(--text-muted);">此 Token 用于 Obsidian 插件或 Python 脚本同步文章</small>
@@ -243,10 +295,10 @@
     </div><!-- #manage-modal -->
 
     <!-- 编辑链接弹窗 -->
-    <div id="edit-modal" class="modal">
+    <div id="edit-modal" class="modal" role="dialog" aria-labelledby="edit-modal-title" aria-modal="true">
         <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>编辑链接</h2>
+            <button type="button" class="close" aria-label="关闭">&times;</button>
+            <h2 id="edit-modal-title">编辑链接</h2>
             <form id="edit-link-form">
                 <input type="hidden" id="edit-link-id">
                 <div class="form-group">
@@ -283,10 +335,10 @@
     </div>
 
     <!-- 编辑分类弹窗 -->
-    <div id="edit-category-modal" class="modal">
+    <div id="edit-category-modal" class="modal" role="dialog" aria-labelledby="edit-category-modal-title" aria-modal="true">
         <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>编辑分类</h2>
+            <button type="button" class="close" aria-label="关闭">&times;</button>
+            <h2 id="edit-category-modal-title">编辑分类</h2>
             <form id="edit-category-form">
                 <input type="hidden" id="edit-category-old-name">
                 <div class="form-group">
@@ -309,9 +361,10 @@
 
     {% if settings and settings.analytics_code %}
     <!-- 统计分析代码 -->
-    {{ settings.analytics_code | safe }}
+    {{ settings.analytics_code }}
     {% endif %}
 
+    <script src="/static/js/sortable.min.js"></script>
     <script src="/static/js/main.js"></script>
 </body>
 </html>

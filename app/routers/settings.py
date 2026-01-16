@@ -8,12 +8,13 @@ from app.database import get_db
 from app.models import Setting
 from app.schemas.setting import SiteSettings
 from app.routers.auth import require_auth
+from app.config import VERSION, GITHUB_URL
 
 router = APIRouter(prefix="/api/v1/settings", tags=["settings"])
 
 SETTINGS_KEYS = [
     "icp", "copyright", "article_page_title", "site_title",
-    "link_size", "protected_article_paths", "analytics_code"
+    "link_size", "protected_article_paths", "analytics_code", "github_url", "timezone"
 ]
 
 async def get_site_settings(db: AsyncSession) -> dict:
@@ -38,11 +39,17 @@ async def get_site_settings(db: AsyncSession) -> dict:
         "article_page_title": "文章",
         "site_title": "个人主页导航",
         "link_size": "medium",
-        "analytics_code": ""
+        "analytics_code": "",
+        "github_url": GITHUB_URL,
+        "timezone": "Asia/Shanghai"
     }
     for key, default in defaults.items():
         if key not in settings_dict:
             settings_dict[key] = default
+
+    # Add version and GitHub URL
+    settings_dict["version"] = VERSION
+    settings_dict["github_url"] = GITHUB_URL
 
     return settings_dict
 

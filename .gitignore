@@ -4,6 +4,12 @@ __pycache__/
 *$py.class
 *.so
 .Python
+.cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.pyre/
+.hypothesis/
 build/
 develop-eggs/
 dist/
@@ -32,11 +38,28 @@ env/
 *.swp
 *.swo
 *~
+.DS_Store
+Thumbs.db
+
+# Editor / OS extras
+.vim/
+.vscode-test/
 
 # Environment variables (IMPORTANT: contains secrets)
 .env
 .env.local
 .env.*.local
+.env.*
+.envrc
+
+# Keys / certificates (IMPORTANT: secrets)
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+*.keystore
+secrets/
 
 # Data directories (mounted as volumes in production)
 data/
@@ -47,9 +70,9 @@ static/icons/
 *.log
 logs/
 
-# OS
-.DS_Store
-Thumbs.db
+# Runtime artifacts
+*.pid
+*.pid.lock
 
 # Testing
 .pytest_cache/
@@ -57,6 +80,14 @@ Thumbs.db
 htmlcov/
 .tox/
 .nox/
+coverage.xml
+pytest.xml
+nosetests.xml
+
+# Local databases
+*.sqlite
+*.sqlite3
+*.db
 
 # Build artifacts
 *.tar.gz

@@ -124,7 +124,7 @@ class LinkService:
 
     async def get_link_by_id(self, link_id: str) -> Optional[Link]:
         """Get link by ID"""
-        result = await self.db.execute(select(Link).where(Link.id == uuid.UUID(link_id)))
+        result = await self.db.execute(select(Link).where(Link.id == link_id))
         return result.scalar_one_or_none()
 
     async def update_link(self, link_id: str, title: str, url: str, icon: Optional[str],
@@ -178,6 +178,36 @@ class LinkService:
                     invalidate_links_cache()
                     return True
         return False
+
+    async def batch_reorder_links(self, link_ids: List[str]) -> bool:
+        """Batch reorder links by ID list"""
+        if not link_ids:
+            return False
+
+        # Get all links and update their sort_order based on the new order
+        for index, link_id in enumerate(link_ids):
+            link = await self.get_link_by_id(link_id)
+            if link:
+                link.sort_order = index
+
+        await self.db.flush()
+        invalidate_links_cache()
+        return True
+
+    async def batch_reorder_categories(self, category_names: List[str]) -> bool:
+        """Batch reorder categories by name list"""
+        if not category_names:
+            return False
+
+        # Get all categories and update their sort_order based on the new order
+        for index, name in enumerate(category_names):
+            category = await self.get_category_by_name(name)
+            if category:
+                category.sort_order = index
+
+        await self.db.flush()
+        invalidate_links_cache()
+        return True
 
     async def _get_max_category_order(self) -> int:
         """Get max sort order for categories"""

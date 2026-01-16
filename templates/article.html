@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>文章 - 个人主页</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -111,7 +112,7 @@
 
     {% if settings and settings.analytics_code %}
     <!-- 统计分析代码 -->
-    {{ settings.analytics_code | safe }}
+    {{ settings.analytics_code }}
     {% endif %}
 
     <script>
@@ -299,7 +300,7 @@
                     throw new Error(errorData.detail || '文章不存在');
                 }
                 const data = await response.json();
-                document.getElementById('article-body').innerHTML = data.html;
+                document.getElementById('article-body').innerHTML = DOMPurify.sanitize(data.html);
 
                 // 保存当前文章信息
                 currentArticlePath = path;
@@ -310,7 +311,12 @@
                     document.getElementById('article-toolbar').style.display = 'block';
                 }
             } catch (error) {
-                document.getElementById('article-body').innerHTML = `<p class="error">加载失败: ${error.message}</p>`;
+                const articleBody = document.getElementById('article-body');
+                articleBody.innerHTML = '';
+                const errorP = document.createElement('p');
+                errorP.className = 'error';
+                errorP.textContent = '加载失败: ' + error.message;
+                articleBody.appendChild(errorP);
                 currentArticlePath = null;
                 currentArticleContent = null;
                 document.getElementById('article-toolbar').style.display = 'none';

@@ -1,113 +1,94 @@
-"""Authentication routes"""
-from fastapi import APIRouter, HTTPException, Depends, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+﻿"""Authentication routes."""
+
 from typing import Optional
-from datetime import datetime
-from jose import jwt
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import delete
 
-from app.schemas.auth import LoginRequest, TokenResponse
-from app.services.auth import AuthService
-from app.utils.security import verify_token
 from app.database import get_db
-from app.models.token_blacklist import TokenBlacklist
-from app.config import get_settings
-
-settings = get_settings()
+from app.schemas.auth import LoginRequest, TokenResponse
+from app.services.auth import (
+    CredentialService,
+    TokenService,
+    get_credential_service,
+    get_token_service,
+)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 security = HTTPBearer(auto_error=False)
 
+
 async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    token_service: TokenService = Depends(get_token_service),
 ) -> Optional[str]:
-    """Get current user (optional auth)"""
+    """Get current user with optional auth."""
     if credentials is None:
         return None
-    return await verify_token(credentials.credentials, db)
+    return await token_service.verify_token(credentials.credentials, db)
+
 
 async def require_auth(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    token_service: TokenService = Depends(get_token_service),
 ) -> str:
-    """Require authentication"""
+    """Require authentication."""
     if credentials is None:
         raise HTTPException(status_code=401, detail="未登录")
-    username = await verify_token(credentials.credentials, db)
+    username = await token_service.verify_token(credentials.credentials, db)
     if username is None:
         raise HTTPException(status_code=401, detail="Token 无效或已过期")
     return username
 
-@router.post("/login", response_model=TokenResponse)
-async def login(request: LoginRequest, req: Request):
-    """User login"""
-    client_ip = req.client.host if req.client else "unknown"
-    auth_service = AuthService()
-    result = auth_service.authenticate(request.username, request.password, client_ip)
 
+@router.post("/login", response_model=TokenResponse)
+async def login(
+    request: LoginRequest,
+    req: Request,
+    credential_service: CredentialService = Depends(get_credential_service),
+):
+    """User login."""
+    client_ip = req.client.host if req.client else "unknown"
+    result = credential_service.authenticate(request.username, request.password, client_ip)
     if "error" in result:
         raise HTTPException(status_code=result["status"], detail=result["error"])
-
     return result
+
 
 @router.post("/logout")
 async def logout(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    token_service: TokenService = Depends(get_token_service),
 ):
-    """User logout - revoke token"""
+    """User logout with server-side token revoke."""
     if credentials is None:
         return {"message": "已登出"}
 
-    try:
-        # 解析 token 获取 jti 和过期时间
-        payload = jwt.decode(
-            credentials.credentials,
-            settings.secret_key,
-            algorithms=[settings.algorithm]
-        )
-        jti = payload.get("jti")
-        username = payload.get("sub")
-        exp = payload.get("exp")
+    revoked = await token_service.revoke_token(credentials.credentials, db)
+    if not revoked:
+        raise HTTPException(status_code=401, detail="Token 无效或已过期")
 
-        if jti and username and exp:
-            # 将 token 加入黑名单
-            blacklist_entry = TokenBlacklist(
-                jti=jti,
-                username=username,
-                revoked_at=datetime.utcnow(),
-                expires_at=datetime.fromtimestamp(exp),
-                reason="logout"
-            )
-            db.add(blacklist_entry)
-            await db.commit()
-    except Exception:
-        # 即使撤销失败也返回成功（客户端会删除 token）
-        pass
-
+    await db.commit()
     return {"message": "已登出"}
+
 
 @router.get("/me")
 async def get_me(username: str = Depends(require_auth)):
-    """Get current user info"""
+    """Get current user info."""
     return {"username": username}
+
 
 @router.post("/cleanup-tokens")
 async def cleanup_expired_tokens(
     username: str = Depends(require_auth),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    token_service: TokenService = Depends(get_token_service),
 ):
-    """Clean up expired tokens from blacklist (admin only)"""
-    # 删除已过期的 token
-    result = await db.execute(
-        delete(TokenBlacklist).where(TokenBlacklist.expires_at < datetime.utcnow())
-    )
+    """Clean up expired tokens from blacklist."""
+    deleted_count = await token_service.cleanup_expired_tokens(db)
     await db.commit()
-    deleted_count = result.rowcount
-
-    return {
-        "message": f"已清理 {deleted_count} 个过期 token",
-        "deleted_count": deleted_count
-    }
+    return {"message": f"已清理 {deleted_count} 个过期 token", "deleted_count": deleted_count}

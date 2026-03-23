@@ -1,7 +1,7 @@
 """Database connection and session management"""
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import event, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
-from sqlalchemy import event
 from sqlalchemy.pool import NullPool
 from app.config import get_settings
 
@@ -36,7 +36,7 @@ async def get_db():
             await session.rollback()
             raise
 
-async def init_db():
-    """Initialize database tables"""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+async def check_db_connection():
+    """Verify that the configured database is reachable."""
+    async with engine.connect() as conn:
+        await conn.execute(text("SELECT 1"))

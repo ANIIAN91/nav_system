@@ -1,7 +1,7 @@
 """Link and Category service"""
 import uuid
 from typing import Optional, List
-from sqlalchemy import select, update, delete
+from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -181,14 +181,37 @@ class LinkService:
 
     async def batch_reorder_links(self, link_ids: List[str]) -> bool:
         """Batch reorder links by ID list"""
-        if not link_ids:
+        if not link_ids or len(set(link_ids)) != len(link_ids):
             return False
 
-        # Get all links and update their sort_order based on the new order
-        for index, link_id in enumerate(link_ids):
-            link = await self.get_link_by_id(link_id)
-            if link:
-                link.sort_order = index
+        result = await self.db.execute(
+            select(Link.id, Link.category_id).where(Link.id.in_(link_ids))
+        )
+        rows = result.all()
+        if len(rows) != len(link_ids):
+            return False
+
+        category_ids = {row.category_id for row in rows}
+        if len(category_ids) != 1:
+            return False
+
+        category_id = next(iter(category_ids))
+        category_link_ids = set(
+            (
+                await self.db.execute(
+                    select(Link.id).where(Link.category_id == category_id)
+                )
+            ).scalars().all()
+        )
+        if category_link_ids != set(link_ids):
+            return False
+
+        order_map = {link_id: index for index, link_id in enumerate(link_ids)}
+        await self.db.execute(
+            Link.__table__.update()
+            .where(Link.id.in_(link_ids))
+            .values(sort_order=case(order_map, value=Link.id, else_=Link.sort_order))
+        )
 
         await self.db.flush()
         invalidate_links_cache()
@@ -196,14 +219,29 @@ class LinkService:
 
     async def batch_reorder_categories(self, category_names: List[str]) -> bool:
         """Batch reorder categories by name list"""
-        if not category_names:
+        if not category_names or len(set(category_names)) != len(category_names):
             return False
 
-        # Get all categories and update their sort_order based on the new order
-        for index, name in enumerate(category_names):
-            category = await self.get_category_by_name(name)
-            if category:
-                category.sort_order = index
+        existing_names = set(
+            (
+                await self.db.execute(
+                    select(Category.name).where(Category.name.in_(category_names))
+                )
+            ).scalars().all()
+        )
+        if existing_names != set(category_names):
+            return False
+
+        all_names = set((await self.db.execute(select(Category.name))).scalars().all())
+        if all_names != set(category_names):
+            return False
+
+        order_map = {name: index for index, name in enumerate(category_names)}
+        await self.db.execute(
+            Category.__table__.update()
+            .where(Category.name.in_(category_names))
+            .values(sort_order=case(order_map, value=Category.name, else_=Category.sort_order))
+        )
 
         await self.db.flush()
         invalidate_links_cache()

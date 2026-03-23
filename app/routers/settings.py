@@ -1,85 +1,34 @@
-"""Settings routes"""
-import json
+﻿"""Settings routes."""
+
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Setting
-from app.schemas.setting import SiteSettings
 from app.routers.auth import require_auth
-from app.config import VERSION, GITHUB_URL
+from app.schemas.site_settings import (
+    SiteSettingsResponse,
+    SiteSettingsUpdateRequest,
+    SiteSettingsUpdateResponse,
+)
+from app.services.settings import SettingsService
 
 router = APIRouter(prefix="/api/v1/settings", tags=["settings"])
 
-SETTINGS_KEYS = [
-    "icp", "copyright", "article_page_title", "site_title",
-    "link_size", "protected_article_paths", "analytics_code", "github_url", "timezone"
-]
 
-async def get_site_settings(db: AsyncSession) -> dict:
-    """Get all site settings as dict"""
-    result = await db.execute(select(Setting))
-    settings = result.scalars().all()
-    settings_dict = {s.key: s.value for s in settings}
+@router.get("", response_model=SiteSettingsResponse)
+async def get_settings(db: AsyncSession = Depends(get_db)) -> SiteSettingsResponse:
+    """Get site settings."""
+    return await SettingsService(db).get_public_settings()
 
-    # Parse protected_article_paths as JSON list
-    if "protected_article_paths" in settings_dict:
-        try:
-            settings_dict["protected_article_paths"] = json.loads(settings_dict["protected_article_paths"])
-        except:
-            settings_dict["protected_article_paths"] = []
-    else:
-        settings_dict["protected_article_paths"] = []
 
-    # Set defaults
-    defaults = {
-        "icp": "",
-        "copyright": "",
-        "article_page_title": "文章",
-        "site_title": "个人主页导航",
-        "link_size": "medium",
-        "analytics_code": "",
-        "github_url": GITHUB_URL,
-        "timezone": "Asia/Shanghai"
-    }
-    for key, default in defaults.items():
-        if key not in settings_dict:
-            settings_dict[key] = default
-
-    # Add version and GitHub URL
-    settings_dict["version"] = VERSION
-    settings_dict["github_url"] = GITHUB_URL
-
-    return settings_dict
-
-@router.get("")
-async def get_settings(db: AsyncSession = Depends(get_db)):
-    """Get site settings"""
-    return await get_site_settings(db)
-
-@router.put("")
+@router.put("", response_model=SiteSettingsUpdateResponse)
 async def update_settings(
-    settings: SiteSettings,
+    settings: SiteSettingsUpdateRequest,
     username: str = Depends(require_auth),
-    db: AsyncSession = Depends(get_db)
-):
-    """Update site settings"""
-    settings_dict = settings.model_dump()
-
-    # Convert protected_article_paths to JSON string
-    if "protected_article_paths" in settings_dict:
-        settings_dict["protected_article_paths"] = json.dumps(settings_dict["protected_article_paths"])
-
-    for key, value in settings_dict.items():
-        if key in SETTINGS_KEYS:
-            result = await db.execute(select(Setting).where(Setting.key == key))
-            setting = result.scalar_one_or_none()
-            if setting:
-                setting.value = str(value) if value is not None else ""
-            else:
-                db.add(Setting(key=key, value=str(value) if value is not None else ""))
-
+    db: AsyncSession = Depends(get_db),
+) -> SiteSettingsUpdateResponse:
+    """Update site settings."""
+    service = SettingsService(db)
+    settings_dict = await service.update_settings(settings)
     await db.commit()
-
-    return {"message": "设置已保存", "settings": await get_site_settings(db)}
+    return {"message": "设置已保存", "settings": settings_dict}

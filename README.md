@@ -2,13 +2,7 @@
 
 基于 `FastAPI + Jinja2 + Vanilla JS + SQLite` 的个人导航与 Markdown 文章系统。
 
-当前代码已经按重构清单切分出比较明确的边界：
-
-- 后端路由保持薄控制器，文件系统/设置/限流逻辑分别落在 `app/services/*`
-- 文章与目录路径规则统一在 `app/core/pathing.py`
-- 站点设置使用 typed `site_settings` 模型和 `SettingsService`
-- 浏览器端按 `core / ui / pages` 拆分
-- Python 同步脚本与 Obsidian 插件都通过各自的 API helper 维护 `/api/v1` 契约
+[Demo](https://navsystem-navsystem.up.railway.app/) | 预览账号: `admin / admin123`
 
 ## 功能
 
@@ -32,6 +26,11 @@
 
 ## 快速开始
 
+- 镜像：`aniian/nav-system:latest`
+- 容器内监听端口：`8000`
+- 示例宿主机端口：`8001`
+- 数据持久化目录：`articles/`、`data/`、`static/icons/`
+
 ### 1. 配置环境变量
 
 复制模板：
@@ -50,43 +49,114 @@ ADMIN_PASSWORD=change_this_password
 
 也可以改用 `ADMIN_PASSWORD_HASH`。
 
-### 2. Docker Compose
+### 2. 准备持久化目录
 
-```bash
-docker compose up -d --build
-```
-
-默认访问：`http://localhost:8001`
-
-容器入口默认会先执行一次：
-
-```bash
-alembic upgrade head
-```
-
-只有在迁移由外部流程保证时，才应显式设置 `SKIP_MIGRATIONS=true` 跳过。
-
-挂载说明：
+这些目录会挂载到容器中，删除容器后数据仍然保留：
 
 - `./articles`：Markdown 文章
 - `./data`：SQLite 数据库
 - `./static/icons`：站点图标缓存
 
-### 3. 本地开发
+如果目录还不存在，先创建：
 
 ```bash
-pip install -r requirements.txt
-alembic upgrade head
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+mkdir -p articles data static/icons
 ```
 
-如果是已有部署升级，必须先执行：
+### 3. 拉取镜像
+
+```bash
+docker pull aniian/nav-system:latest
+```
+
+### 4. 启动容器
+
+```bash
+docker run -d \
+  --name nav-system \
+  -p 8001:8000 \
+  --env-file .env \
+  -v $(pwd)/articles:/app/articles \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/static/icons:/app/static/icons \
+  --restart unless-stopped \
+  aniian/nav-system:latest
+```
+
+参数说明：
+
+- `-d`：后台运行容器
+- `--name nav-system`：固定容器名，方便后续日志、重启、升级操作
+- `-p 8001:8000`：把宿主机 `8001` 映射到容器内 `8000`
+- `--env-file .env`：从项目目录下的 `.env` 读取环境变量
+- `-v ...:/app/articles`：持久化文章目录
+- `-v ...:/app/data`：持久化 SQLite 数据库
+- `-v ...:/app/static/icons`：持久化图标缓存
+- `--restart unless-stopped`：宿主机重启后自动拉起
+
+启动完成后访问：`http://localhost:8001`
+
+### 5. 首次启动会做什么
+
+容器入口会默认先执行：
 
 ```bash
 alembic upgrade head
 ```
 
-应用启动阶段不再自动建表；无论是空库初始化还是版本升级，都必须通过 Alembic 管理 schema。
+这意味着：
+
+- 空库首次启动时会自动初始化 schema
+- 老版本升级时会自动执行数据库迁移
+- 只有在迁移已经由外部流程保证时，才应该显式设置 `SKIP_MIGRATIONS=true`
+
+应用启动阶段不再使用 `create_all()` 自动建表，schema 统一由 Alembic 管理。
+
+### 6. 常用容器管理
+
+查看日志：
+
+```bash
+docker logs -f nav-system
+```
+
+停止容器：
+
+```bash
+docker stop nav-system
+```
+
+启动容器：
+
+```bash
+docker start nav-system
+```
+
+删除容器：
+
+```bash
+docker rm -f nav-system
+```
+
+### 7. 升级方式
+
+保留挂载目录不变时，升级只需要替换容器，不需要迁移文章和数据库文件：
+
+```bash
+docker pull aniian/nav-system:latest
+docker rm -f nav-system
+docker run -d \
+  --name nav-system \
+  -p 8001:8000 \
+  --env-file .env \
+  -v $(pwd)/articles:/app/articles \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/static/icons:/app/static/icons \
+  --restart unless-stopped \
+  aniian/nav-system:latest
+```
+
+因为数据库和文章目录都在宿主机挂载中，新容器启动时会直接复用旧数据，并自动执行最新迁移。
 
 ## 设置模型
 
@@ -109,7 +179,7 @@ alembic upgrade head
 
 页面请求路径上只做单次插入，不再在热路径里做 `count + delete`。
 
-默认部署会在应用启动后先执行一次日志保留清理，并在后台按固定间隔重复执行。
+默认 Docker 容器会在应用启动后先执行一次日志保留清理，并在后台按固定间隔重复执行。
 
 默认参数：
 
@@ -123,15 +193,14 @@ alembic upgrade head
 手动清理入口仍然保留：
 
 ```bash
-python scripts/cleanup_logs.py
-python scripts/cleanup_logs.py --max-visits 2000 --max-updates 1000
-docker compose run --rm --profile maintenance log-cleanup
+docker exec nav-system python scripts/cleanup_logs.py
+docker exec nav-system python scripts/cleanup_logs.py --max-visits 2000 --max-updates 1000
 ```
 
 说明：
 
-- 应用内定时清理是本地、裸机和 Docker Compose 默认路径
-- `scripts/cleanup_logs.py` 适合手动补跑或外部调度
+- 应用内定时清理是默认 Docker 运行路径
+- `scripts/cleanup_logs.py` 适合手动补跑或由宿主机外部调度执行
 - 清理结果会输出删除数量和当前保留数量，可从脚本 stdout 或应用日志观察
 
 ## 同步客户端
@@ -229,12 +298,6 @@ app/
 
 ## 测试与 CI
 
-本地运行：
-
-```bash
-pytest -q
-```
-
 CI 当前会校验：
 
 - 空库可以直接执行 `alembic upgrade head`
@@ -257,7 +320,6 @@ nav_system/
 ├── static/
 ├── templates/
 ├── tests/
-├── docker-compose.yml
 ├── Dockerfile
 └── REFACTOR_CHECKLIST.md
 ```
@@ -266,7 +328,7 @@ nav_system/
 
 - 生产环境请放在 HTTPS 反向代理后
 - 定期备份 `data/` 与 `articles/`
-- 任何环境启动前都要先确保 `alembic upgrade head` 已执行
+- 每次升级前先 `docker pull` 新镜像，再用原有挂载目录重新创建容器
 - 默认应用内日志清理保持开启；只有在外部已有调度时再关闭并改用 `scripts/cleanup_logs.py`
 
 ## License

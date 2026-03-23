@@ -1,385 +1,274 @@
-# Nav System - 个人导航与文章系统
+﻿# Nav System
 
-[Demo](https://navsystem-navsystem.up.railway.app/) | 预览账号: `admin` / `admin123`
+基于 `FastAPI + Jinja2 + Vanilla JS + SQLite` 的个人导航与 Markdown 文章系统。
 
-基于 FastAPI + SQLite 的个人主页系统，集成导航站和 Markdown 文章展示功能。采用 **Zen-iOS Hybrid** 设计语言，提供极致的毛玻璃效果和物理触感。
+当前代码已经按重构清单切分出比较明确的边界：
 
-## ✨ 功能特性
+- 后端路由保持薄控制器，文件系统/设置/限流逻辑分别落在 `app/services/*`
+- 文章与目录路径规则统一在 `app/core/pathing.py`
+- 站点设置使用 typed `site_settings` 模型和 `SettingsService`
+- 浏览器端按 `core / ui / pages` 拆分
+- Python 同步脚本与 Obsidian 插件都通过各自的 API helper 维护 `/api/v1` 契约
 
-### 导航站
-- 🔖 分类展示常用链接，支持权限控制
-- 🎨 自动获取网站 favicon
-- 📏 链接大小可调（小/中/大）
-- ⏰ 实时时钟显示
+## 功能
 
-### 文章系统
-- 📝 Markdown 文章在线展示与编辑
-- 📂 目录结构浏览（可折叠）
-- 🔒 目录权限控制
-- 🔄 Obsidian 插件同步支持
+- 导航链接、分类、拖拽排序、导入导出
+- Markdown 文章浏览、编辑、目录管理
+- 目录级文章保护
+- 管理后台设置、访问日志、更新日志
+- JWT 登录、服务端登出撤销、登录限流
+- Obsidian 插件同步和 Python 批量同步脚本
 
-### 管理功能
-- ⚙️ 站点设置（标题、备案信息、受保护目录等）
-- 📊 访问记录与更新记录
-- 🌓 深色/浅色主题切换
-- 🛡️ 暴力破解防护（5次失败锁定15分钟）
+## API 约定
 
-## 🚀 快速开始
+所有接口统一使用 `/api/v1` 前缀。
 
-### 方式一：Docker Compose（推荐）
+常用分组：
 
-**1. 配置环境变量**
+- 认证：`/api/v1/auth/*`
+- 导航：`/api/v1/links/*`、`/api/v1/categories/*`
+- 文章：`/api/v1/articles/*`、`/api/v1/folders/*`
+- 设置与日志：`/api/v1/settings`、`/api/v1/logs/*`
+
+## 快速开始
+
+### 1. 配置环境变量
+
+复制模板：
 
 ```bash
-# 复制环境变量模板
 cp .env.example .env
-
-# 编辑 .env 文件，配置数据库和管理员信息
-nano .env
 ```
 
-`.env` 配置示例：
+最少需要：
+
 ```env
-# 数据库配置（可选，默认使用 SQLite）
-# DATABASE_URL=sqlite+aiosqlite:///./data/nav_system.db
-
-# 安全配置
-SECRET_KEY=your-random-32-character-secret-key
+SECRET_KEY=generate-a-random-32-char-string-here
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=your_admin_password
+ADMIN_PASSWORD=change_this_password
 ```
 
-**2. 启动应用**
+也可以改用 `ADMIN_PASSWORD_HASH`。
+
+### 2. Docker Compose
 
 ```bash
-# 构建并启动容器
 docker compose up -d --build
-
-# 查看日志
-docker compose logs -f
-
-# 停止容器
-docker compose down
 ```
 
-访问 `http://localhost:8001`
+默认访问：`http://localhost:8001`
 
-### API 前缀
-
-本项目 API 统一使用 `/api/v1` 前缀（例如：`/api/v1/links`、`/api/v1/auth/login`）。
-
-### 方式二：Docker Run（使用预构建镜像）
-
-**1. 拉取镜像**
+容器入口默认会先执行一次：
 
 ```bash
-docker pull aniian/nav-system:latest
+alembic upgrade head
 ```
 
-**2. 运行容器**
+只有在迁移由外部流程保证时，才应显式设置 `SKIP_MIGRATIONS=true` 跳过。
+
+挂载说明：
+
+- `./articles`：Markdown 文章
+- `./data`：SQLite 数据库
+- `./static/icons`：站点图标缓存
+
+### 3. 本地开发
 
 ```bash
-docker run -d \
-  --name nav-system \
-  -p 8001:8000 \
-  --env-file .env \
-  -v $(pwd)/articles:/app/articles \
-  -v $(pwd)/data:/app/data \
-  -v $(pwd)/static/icons:/app/static/icons \
-  --restart unless-stopped \
-  aniian/nav-system:latest
-```
-
-**3. 管理容器**
-
-```bash
-# 查看日志
-docker logs -f nav-system
-
-# 停止容器
-docker stop nav-system
-
-# 启动容器
-docker start nav-system
-
-# 删除容器
-docker rm -f nav-system
-```
-
-### 方式三：本地开发
-
-**1. 环境准备**
-
-```bash
-# 创建 Python 环境
-conda create -n homepage python=3.9
-conda activate homepage
-
-# 安装依赖
 pip install -r requirements.txt
-```
-
-**2. 配置环境变量**
-
-创建 `.env` 文件（参考上面的配置示例）
-
-**3. 启动服务**
-
-```bash
+alembic upgrade head
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
-访问 `http://localhost:8001`
-
-## 📦 Docker 配置说明
-
-### 端口映射
-- `-p 8001:8000`：将容器的 8000 端口映射到主机的 8001 端口
-
-### 数据持久化（Volume 挂载）
-- `./articles:/app/articles`：Markdown 文章目录
-- `./data:/app/data`：数据文件目录
-- `./static/icons:/app/static/icons`：网站图标目录
-
-### 环境变量
-使用 `--env-file .env` 加载环境变量，或使用 `-e` 单独指定：
+如果是已有部署升级，必须先执行：
 
 ```bash
-docker run -d \
-  -e SECRET_KEY=your_secret \
-  -e ADMIN_USERNAME=admin \
-  -e ADMIN_PASSWORD=admin123 \
-  ...
+alembic upgrade head
 ```
 
-## 🗄️ 数据库说明
+应用启动阶段不再自动建表；无论是空库初始化还是版本升级，都必须通过 Alembic 管理 schema。
 
-本项目使用 **SQLite** 作为数据库，具有以下优势：
+## 设置模型
 
-- ✅ **零配置**：无需安装和配置外部数据库服务
-- ✅ **单文件存储**：数据库文件位于 `data/nav_system.db`
-- ✅ **易于备份**：直接复制 `.db` 文件即可完成备份
-- ✅ **轻量高效**：适合个人使用场景，性能优异
+站点设置已集中到单行 typed 表 `site_settings`，主要字段包括：
 
-### 数据持久化
+- `site_title`
+- `article_page_title`
+- `icp`
+- `copyright`
+- `link_size`
+- `timezone`
+- `github_url`
+- `protected_article_paths_json`
 
-确保挂载 `data` 目录以持久化数据库：
+对应读写入口是 `app/services/settings.py`。
+
+旧的 key-value `settings` 表、`app/models/setting.py` 和 `app/schemas/setting.py` 兼容层已移除。旧部署升级到当前版本时，需要先执行 `alembic upgrade head`，让 `20260324_01` 完成数据迁移，再由 `20260324_02` 删除旧表。如果数据库里同时存在已写入的 `site_settings` 和旧 `settings`，迁移会显式拒绝继续，避免在双写状态下静默丢失配置。
+
+## 日志保留策略
+
+页面请求路径上只做单次插入，不再在热路径里做 `count + delete`。
+
+默认部署会在应用启动后先执行一次日志保留清理，并在后台按固定间隔重复执行。
+
+默认参数：
+
+- `ENABLE_LOG_CLEANUP=true`
+- `LOG_CLEANUP_INTERVAL_SECONDS=21600`（每 6 小时一次）
+- `MAX_VISIT_RECORDS=1000`
+- `MAX_UPDATE_RECORDS=500`
+
+如果已经通过外部调度执行清理脚本，可以显式设置 `ENABLE_LOG_CLEANUP=false` 关闭应用内定时清理。
+
+手动清理入口仍然保留：
 
 ```bash
--v $(pwd)/data:/app/data
+python scripts/cleanup_logs.py
+python scripts/cleanup_logs.py --max-visits 2000 --max-updates 1000
+docker compose run --rm --profile maintenance log-cleanup
 ```
 
-### 自定义数据库路径（可选）
+说明：
 
-如需使用其他数据库或自定义路径，可通过环境变量指定：
+- 应用内定时清理是本地、裸机和 Docker Compose 默认路径
+- `scripts/cleanup_logs.py` 适合手动补跑或外部调度
+- 清理结果会输出删除数量和当前保留数量，可从脚本 stdout 或应用日志观察
 
-```env
-# 使用自定义 SQLite 路径
-DATABASE_URL=sqlite+aiosqlite:///./custom/path/database.db
-```
+## 同步客户端
 
-## 🌐 生产部署
+### Python 批量同步
 
-### Railway 一键部署
+脚本入口：`scripts/sync_articles.py`
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/MxkRwo?referralCode=TEG7-_)
+共享 API 契约：`scripts/nav_client.py`
 
-### Nginx 反向代理
+示例：
 
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    location / {
-        proxy_pass http://localhost:8001;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-## 🔌 Obsidian 插件
-
-Nav System 提供 Obsidian 插件，可以将 Obsidian 笔记同步到导航系统的文章模块。
-
-### 安装步骤
-
-1. **复制插件文件**
-   ```bash
-   # 在 Obsidian vault 目录下
-   mkdir -p .obsidian/plugins/nav-system-sync
-   cp -r /path/to/nav_system/obsidian-plugin/* .obsidian/plugins/nav-system-sync/
-   ```
-
-2. **启用插件**
-   - 打开 Obsidian 设置
-   - 进入"第三方插件"
-   - 关闭"安全模式"
-   - 在"已安装插件"中找到"Nav System Sync"
-   - 点击启用
-
-3. **配置插件**
-   - 在插件设置中配置以下信息：
-     - **API 地址**：你的 Nav System 地址（如 `https://your-domain.com` 或 `http://localhost:8001`）
-     - **JWT Token**：从管理界面获取（见下方说明）
-     - **默认路径**：文章保存的默认路径（默认 `notes`）
-     - **自动同步**：保存时自动上传（可选）
-
-### 获取 JWT Token
-
-1. 登录 Nav System 管理界面
-2. 进入"导入导出"标签页
-3. 在"API Token"部分，复制显示的 Token
-4. 将 Token 粘贴到 Obsidian 插件设置中
-
-### 功能说明
-
-**命令面板：**
-- `上传当前文件到 Nav System`：上传当前打开的文件
-- `上传当前文件（指定路径）`：上传并自定义保存路径
-
-**右键菜单：**
-- 右键 Markdown 文件 → "上传到 Nav System"
-- 右键文件夹 → "上传文件夹到 Nav System"
-
-**编辑器菜单：**
-- 在编辑器中右键 → "上传到 Nav System"
-
-**自动同步：**
-- 启用后，保存文件时自动上传到 Nav System
-
-**状态栏：**
-- 显示"Nav Sync"图标，表示插件已启用
-
-### 使用方法
-
-**上传单个文件：**
-1. 打开要上传的 Markdown 文件
-2. 按 `Ctrl/Cmd + P` 打开命令面板
-3. 输入"上传当前文件"并执行
-4. 或者右键文件 → "上传到 Nav System"
-
-**上传整个文件夹：**
-1. 在文件列表中右键文件夹
-2. 选择"上传文件夹到 Nav System"
-3. 插件会递归上传所有 Markdown 文件
-
-**批量同步脚本：**
 ```bash
 python scripts/sync_articles.py \
   --vault /path/to/obsidian/vault \
-  --api https://your-domain.com \
+  --api http://localhost:8001 \
   --token YOUR_JWT_TOKEN
 ```
 
-### 注意事项
+常用参数：
 
-- 上传的文件会保存到 `articles/` 目录
-- 文件路径结构会保持与 Obsidian vault 中一致
-- 支持中文文件名和路径
-- 图片等附件需要单独处理（暂不支持自动上传）
+- `--target`：目标目录前缀
+- `--pattern`：自定义匹配模式
+- `--exclude`：排除模式
+- `--force`：强制重传
+- `--test`：仅测试连接
 
-## 📡 API 接口
+### Obsidian 插件
 
-### 认证
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/v1/auth/login` | 登录 |
-| POST | `/api/v1/auth/logout` | 登出 |
-| GET | `/api/v1/auth/me` | 当前用户信息 |
+插件目录：`obsidian-plugin/`
 
-### 导航链接
-| 方法 | 路径 | 说明 | 认证 |
-|------|------|------|------|
-| GET | `/api/v1/links` | 获取链接列表 | 否 |
-| POST | `/api/v1/links` | 添加链接 | 是 |
-| PUT | `/api/v1/links/{id}` | 修改链接 | 是 |
-| DELETE | `/api/v1/links/{id}` | 删除链接 | 是 |
+共享 API 契约：`obsidian-plugin/api.js`
 
-### 分类
-| 方法 | 路径 | 说明 | 认证 |
-|------|------|------|------|
-| POST | `/api/v1/categories` | 添加分类 | 是 |
-| PUT | `/api/v1/categories/{name}` | 修改分类 | 是 |
-| DELETE | `/api/v1/categories/{name}` | 删除分类 | 是 |
+配置项：
 
-### 文章
-| 方法 | 路径 | 说明 | 认证 |
-|------|------|------|------|
-| GET | `/api/v1/articles` | 文章列表 | 否 |
-| GET | `/api/v1/articles/{path}` | 文章内容 | 否* |
-| POST | `/api/v1/articles/sync` | 同步文章 | 是 |
-| PUT | `/api/v1/articles/{path}` | 编辑文章 | 是 |
-| DELETE | `/api/v1/articles/{path}` | 删除文章 | 是 |
+- 服务地址
+- JWT Token
+- 默认同步路径
+- 自动同步开关
 
-> *受保护目录下的文章需要登录
+Token 可在首页管理弹窗的“导入导出”页签中复制。前端现在只提供“记住用户名”，不再保存密码。
 
-### 目录管理
-| 方法 | 路径 | 说明 | 认证 |
-|------|------|------|------|
-| GET | `/api/v1/folders` | 目录列表 | 是 |
-| POST | `/api/v1/folders?name={name}` | 创建目录 | 是 |
-| PUT | `/api/v1/folders/{name}` | 重命名目录 | 是 |
-| DELETE | `/api/v1/folders/{name}` | 删除目录 | 是 |
+## 前端结构
 
-### 设置与日志
-| 方法 | 路径 | 说明 | 认证 |
-|------|------|------|------|
-| GET | `/api/v1/settings` | 获取设置 | 否 |
-| PUT | `/api/v1/settings` | 更新设置 | 是 |
-| GET | `/api/v1/logs/visits` | 访问记录 | 是 |
-| GET | `/api/v1/logs/updates` | 更新记录 | 是 |
-
-## 🛠️ 技术栈
-
-- **后端**: Python FastAPI
-- **数据库**: SQLite + SQLAlchemy (async)
-- **认证**: JWT Token
-- **前端**: HTML + CSS + JavaScript + Jinja2
-- **设计**: Zen-iOS Hybrid（毛玻璃效果 + 物理触感）
-- **部署**: Docker + Docker Compose
-
-## 📁 项目结构
-
+```text
+static/js/
+  core/
+    auth.js
+    endpoints.js
+    http.js
+    state.js
+  ui/
+    modal.js
+    theme.js
+    toast.js
+  pages/
+    home.js
+    articles.js
 ```
+
+说明：
+
+- `core/endpoints.js` 是浏览器端接口路径唯一来源
+- `core/http.js` 负责通用请求、鉴权头和 401 回调
+- `pages/home.js`、`pages/articles.js` 只保留页面编排逻辑
+- 模板中不再保留文章页内联业务脚本，首页也已切到模块入口
+
+## 后端结构
+
+```text
+app/
+  core/
+    pathing.py
+  models/
+    site_settings.py
+  routers/
+    articles.py
+    auth.py
+    folders.py
+    settings.py
+  services/
+    articles.py
+    auth.py
+    folders.py
+    rate_limit.py
+    settings.py
+```
+
+说明：
+
+- `routers/*` 负责参数解析、依赖注入和响应映射
+- `services/articles.py`、`services/folders.py` 接管文件系统操作
+- `services/auth.py` 使用 `RateLimiter` 抽象
+- `services/settings.py` 负责 typed settings、默认值和缓存
+
+## 测试与 CI
+
+本地运行：
+
+```bash
+pytest -q
+```
+
+CI 当前会校验：
+
+- 空库可以直接执行 `alembic upgrade head`
+- 测试通过
+- 客户端业务代码里不重新硬编码 `/api/v1/...`
+- 首页模板不再回退到旧 `static/js/main.js`
+- 文章页模板没有重新引入大段内联脚本
+- legacy settings model/schema 不被重新引入
+
+## 目录概览
+
+```text
 nav_system/
 ├── app/
-│   ├── main.py              # FastAPI 应用入口
-│   ├── config.py            # 配置管理
-│   ├── database.py          # 数据库连接
-│   ├── models/              # SQLAlchemy 模型
-│   ├── schemas/             # Pydantic 模型
-│   ├── routers/             # API 路由
-│   ├── services/            # 业务逻辑
-│   └── utils/               # 工具函数
-├── templates/               # HTML 模板
-├── static/                  # 静态资源
-│   ├── css/style.css        # Zen-iOS Hybrid 样式
-│   ├── js/main.js           # 前端逻辑
-│   └── icons/               # 网站图标
-├── articles/                # Markdown 文章
-├── data/                    # SQLite 数据库文件
-├── scripts/                 # 工具脚本
-├── alembic/                 # 数据库迁移
-├── tests/                   # 测试
-├── obsidian-plugin/         # Obsidian 同步插件
-├── docker-compose.yml       # Docker Compose 配置
-├── Dockerfile               # Docker 镜像构建
-├── requirements.txt         # Python 依赖
-└── .env                     # 环境变量配置
+├── alembic/
+├── articles/
+├── data/
+├── obsidian-plugin/
+├── scripts/
+├── static/
+├── templates/
+├── tests/
+├── docker-compose.yml
+├── Dockerfile
+└── REFACTOR_CHECKLIST.md
 ```
 
-## ⚠️ 注意事项
+## 维护建议
 
-- 生产环境建议使用 Nginx 反向代理并启用 HTTPS
-- 定期备份 `data/nav_system.db` 数据库文件和 `articles/` 目录
-- `SECRET_KEY` 必须是随机生成的 32 字符以上字符串
-- 首次启动会自动创建数据库表结构
-- Docker 部署时确保挂载 `data` 目录以持久化数据
+- 生产环境请放在 HTTPS 反向代理后
+- 定期备份 `data/` 与 `articles/`
+- 任何环境启动前都要先确保 `alembic upgrade head` 已执行
+- 默认应用内日志清理保持开启；只有在外部已有调度时再关闭并改用 `scripts/cleanup_logs.py`
 
-## 📄 License
+## License
 
-MIT License
+MIT

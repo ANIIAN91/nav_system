@@ -52,8 +52,10 @@ class Settings:
         self.templates_dir: Path = self.base_dir / "templates"
 
         # Logs
-        self.max_visit_records: int = 1000
-        self.max_update_records: int = 500
+        self.max_visit_records: int = int(os.getenv("MAX_VISIT_RECORDS", "1000"))
+        self.max_update_records: int = int(os.getenv("MAX_UPDATE_RECORDS", "500"))
+        self.enable_log_cleanup: bool = os.getenv("ENABLE_LOG_CLEANUP", "true").lower() == "true"
+        self.log_cleanup_interval_seconds: int = int(os.getenv("LOG_CLEANUP_INTERVAL_SECONDS", "21600"))
 
 @lru_cache
 def get_settings() -> Settings:

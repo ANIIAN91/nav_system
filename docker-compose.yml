@@ -1,4 +1,4 @@
-version: '3.8'
+﻿version: '3.8'
 
 services:
   app:
@@ -7,8 +7,25 @@ services:
       - "8001:8000"
     env_file:
       - .env
+    environment:
+      ENABLE_LOG_CLEANUP: ${ENABLE_LOG_CLEANUP:-true}
+      LOG_CLEANUP_INTERVAL_SECONDS: ${LOG_CLEANUP_INTERVAL_SECONDS:-21600}
+      MAX_VISIT_RECORDS: ${MAX_VISIT_RECORDS:-1000}
+      MAX_UPDATE_RECORDS: ${MAX_UPDATE_RECORDS:-500}
+      SKIP_MIGRATIONS: ${SKIP_MIGRATIONS:-false}
     volumes:
       - ./articles:/app/articles
       - ./data:/app/data
       - ./static/icons:/app/static/icons
     restart: unless-stopped
+
+  log-cleanup:
+    build: .
+    command: python scripts/cleanup_logs.py
+    profiles:
+      - maintenance
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    restart: "no"

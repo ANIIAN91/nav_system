@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify Alembic upgrade on empty database
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///./ci-empty.db
+          SECRET_KEY: ci-secret-key-32-chars-minimum-123456
+          ADMIN_USERNAME: admin
+          ADMIN_PASSWORD: admin123
+        run: python -m alembic upgrade head
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Check endpoint contract hygiene
+        run: |
+          ! rg '/api/v1/' scripts/sync_articles.py obsidian-plugin/main.js static/js/pages/home.js static/js/pages/articles.js
+          ! rg '<script>' templates/article.html
+          ! rg '/static/js/main.js' templates/index.html
+          test ! -e app/models/setting.py
+          test ! -e app/schemas/setting.py
+          ! rg 'from app.models import Setting|from app.models.setting import Setting|app.schemas.setting' app tests alembic

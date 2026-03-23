@@ -1,6 +1,6 @@
 """Category schemas"""
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class CategoryBase(BaseModel):
     name: str
@@ -14,6 +14,4 @@ class CategoryUpdate(CategoryBase):
 
 class CategoryResponse(CategoryBase):
     id: int
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

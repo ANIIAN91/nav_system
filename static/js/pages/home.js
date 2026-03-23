@@ -1,60 +1,20 @@
-/**
- * 个人主页导航系统 - 前端逻辑
- */
-
-// Toast 队列管理
-const toastQueue = [];
-let toastIdCounter = 0;
-
-// Toast 提示函数（支持队列）
-function showToast(message, type = 'info') {
-    const toastId = toastIdCounter++;
-
-    // 创建新 toast
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.textContent = message;
-    toast.dataset.toastId = toastId;
-
-    // ARIA 可访问性属性
-    toast.setAttribute('role', 'status');
-    toast.setAttribute('aria-live', 'polite');
-    toast.setAttribute('aria-atomic', 'true');
-
-    document.body.appendChild(toast);
-
-    // 添加到队列
-    toastQueue.push({ id: toastId, element: toast });
-
-    // 更新所有 toast 的位置
-    updateToastPositions();
-
-    // 显示动画
-    setTimeout(() => toast.classList.add('show'), 10);
-
-    // 3秒后自动隐藏
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => {
-            toast.remove();
-            // 从队列中移除
-            const index = toastQueue.findIndex(t => t.id === toastId);
-            if (index !== -1) {
-                toastQueue.splice(index, 1);
-                updateToastPositions();
-            }
-        }, 300);
-    }, 3000);
-}
-
-// 更新 Toast 位置（垂直堆叠）
-function updateToastPositions() {
-    let offset = 80; // 初始顶部偏移
-    toastQueue.forEach((item, index) => {
-        item.element.style.top = `${offset}px`;
-        offset += item.element.offsetHeight + 12; // 12px 间距
-    });
-}
+import {
+    clearRememberedUsername,
+    clearSession,
+    cleanupLegacyCredentialStorage,
+    getToken,
+    getUsername,
+    loadSavedUsername,
+    revokeSession,
+    setRememberedUsername,
+    storeSession,
+} from "../core/auth.js";
+import { endpoints } from "../core/endpoints.js";
+import { apiFetch, setUnauthorizedHandler } from "../core/http.js";
+import { homePageState as state } from "../core/state.js";
+import { closeModal, initModalSystem, openModal } from "../ui/modal.js";
+import { initTheme, toggleTheme } from "../ui/theme.js";
+import { showToast } from "../ui/toast.js";
 
 // URL protocol validation to prevent XSS via javascript: protocol
 function isSafeUrl(url) {
@@ -67,69 +27,24 @@ function isSafeUrl(url) {
     }
 }
 
-// 状态管理
-const state = {
-    token: localStorage.getItem('token') || sessionStorage.getItem('token') || null,
-    username: localStorage.getItem('username') || sessionStorage.getItem('username') || null,
-    links: { categories: [] },
-    isManageMode: false,
-    theme: localStorage.getItem('theme') || 'dark',
-    settings: { link_size: 'medium', protected_article_paths: [] },
-    currentCategory: null  // 当前选中的分类，null 表示默认选中第一个
-};
-
-// 确保 token 是有效字符串或 null（防止空字符串）
-if (state.token && state.token.trim() === '') {
-    state.token = null;
-    localStorage.removeItem('token');
-    sessionStorage.removeItem('token');
-}
-if (state.username && state.username.trim() === '') {
-    state.username = null;
-    localStorage.removeItem('username');
-    sessionStorage.removeItem('username');
+function syncAuthState() {
+    state.token = getToken();
+    state.username = getUsername();
 }
 
-// 主题切换
-function initTheme() {
-    document.documentElement.setAttribute('data-theme', state.theme);
-    updateThemeIcon(state.theme);
-}
+syncAuthState();
 
-function toggleTheme() {
-    state.theme = state.theme === 'light' ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', state.theme);
-    localStorage.setItem('theme', state.theme);
-    updateThemeIcon(state.theme);
-}
-
-function updateThemeIcon(theme) {
-    const btn = document.getElementById('theme-toggle');
-    if (btn) {
-        btn.innerHTML = theme === 'light' ? '&#9728;' : '&#9790;';
-    }
-}
-
-// API 请求封装
 async function api(url, options = {}) {
-    const headers = {
-        'Content-Type': 'application/json',
-        ...options.headers
-    };
-
-    if (state.token) {
-        headers['Authorization'] = `Bearer ${state.token}`;
-    }
-
-    const response = await fetch(url, { ...options, headers });
-
+    const response = await apiFetch(url, options);
     if (response.status === 401) {
-        logout();
         throw new Error('登录已过期');
     }
-
     return response;
 }
+
+setUnauthorizedHandler(async () => {
+    await logout({ revoke: false, silent: true });
+});
 
 // 时钟
 function updateClock() {
@@ -165,6 +80,7 @@ updateClock();
 
 // 更新 UI 状态
 function updateUI() {
+    syncAuthState();
     const loginBtn = document.getElementById('login-btn');
     const logoutBtn = document.getElementById('logout-btn');
     const manageBtn = document.getElementById('manage-btn');
@@ -189,7 +105,7 @@ function updateUI() {
 // 加载导航链接
 async function loadLinks() {
     try {
-        const response = await api('/api/v1/links');
+        const response = await api(endpoints.links.list());
         state.links = await response.json();
         renderCategoryNav();
         renderLinks();
@@ -405,10 +321,10 @@ function updateCategorySelect() {
 // 登录
 async function login(username, password, rememberUsername) {
     try {
-        const response = await fetch('/api/v1/auth/login', {
+        const response = await api(endpoints.auth.login(), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
+            body: JSON.stringify({ username, password }),
+            auth: false
         });
 
         if (!response.ok) {
@@ -417,27 +333,19 @@ async function login(username, password, rememberUsername) {
         }
 
         const data = await response.json();
-        state.token = data.access_token;
-        state.username = username;
-
-        // 始终使用 localStorage 以支持跨标签页登录状态共享
-        // Token 有效期为 30 天，由后端控制
-        localStorage.setItem('token', state.token);
-        localStorage.setItem('username', username);
+        storeSession(data.access_token, username);
+        syncAuthState();
 
         // 安全改进：只记住用户名，不存储密码
         // 密码应由浏览器密码管理器处理
         if (rememberUsername) {
-            localStorage.setItem('savedUsername', username);
-            localStorage.setItem('rememberUsername', 'true');
+            setRememberedUsername(username);
         } else {
-            localStorage.removeItem('savedUsername');
-            localStorage.removeItem('rememberUsername');
+            clearRememberedUsername();
         }
 
         // 清理旧版本可能存储的密码（安全迁移）
-        localStorage.removeItem('savedPassword');
-        localStorage.removeItem('rememberCredentials');
+        cleanupLegacyCredentialStorage();
 
         updateUI();
         loadLinks();
@@ -450,30 +358,16 @@ async function login(username, password, rememberUsername) {
 
 // 加载保存的用户名（不再加载密码）
 function loadSavedCredentials() {
-    // 清理旧版本可能存储的密码（安全迁移）
-    if (localStorage.getItem('savedPassword')) {
-        localStorage.removeItem('savedPassword');
-        localStorage.removeItem('rememberCredentials');
-    }
-
-    // 只加载用户名
-    if (localStorage.getItem('rememberUsername') === 'true') {
-        const savedUsername = localStorage.getItem('savedUsername');
-        if (savedUsername) {
-            document.getElementById('username').value = savedUsername;
-            document.getElementById('remember-credentials').checked = true;
-        }
+    const savedUsername = loadSavedUsername();
+    if (savedUsername) {
+        document.getElementById('username').value = savedUsername;
+        document.getElementById('remember-credentials').checked = true;
     }
 }
 
-// 登出
-function logout() {
-    state.token = null;
-    state.username = null;
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('username');
+function clearAuthState() {
+    clearSession();
+    syncAuthState();
 
     // 如果当前在私密分类，退出后切换到第一个非私密分类
     const currentCat = state.links.categories.find(cat => cat.name === state.currentCategory);
@@ -487,16 +381,32 @@ function logout() {
             state.currentCategory = state.links.categories.length > 0 ? state.links.categories[0].name : null;
         }
     }
+}
 
+// 登出
+async function logout({ revoke = true, silent = false } = {}) {
+    const token = state.token;
+
+    if (revoke && token) {
+        try {
+            await revokeSession(token);
+        } catch (error) {
+            console.warn('调用登出接口失败:', error);
+        }
+    }
+
+    clearAuthState();
     updateUI();
-    loadLinks();
-    loadSettings();
+    await Promise.all([loadLinks(), loadSettings()]);
+    if (!silent) {
+        showToast('已登出', 'success');
+    }
 }
 
 // 添加链接
 async function addLink(category, title, url, icon) {
     try {
-        const response = await api(`/api/v1/links?category_name=${encodeURIComponent(category)}`, {
+        const response = await api(endpoints.links.create(category), {
             method: 'POST',
             body: JSON.stringify({ title, url, icon: icon || null })
         });
@@ -517,7 +427,7 @@ async function addLink(category, title, url, icon) {
 // 更新链接
 async function updateLink(id, title, url, icon, category) {
     try {
-        const response = await api(`/api/v1/links/${id}`, {
+        const response = await api(endpoints.links.detail(id), {
             method: 'PUT',
             body: JSON.stringify({ title, url, icon: icon || null, category: category || null })
         });
@@ -541,7 +451,7 @@ async function deleteLink(id) {
     if (!confirm('确定要删除这个链接吗？')) return;
 
     try {
-        const response = await api(`/api/v1/links/${id}`, {
+        const response = await api(endpoints.links.detail(id), {
             method: 'DELETE'
         });
 
@@ -559,7 +469,7 @@ async function deleteLink(id) {
 // 添加分类
 async function addCategory(name, authRequired) {
     try {
-        const response = await api('/api/v1/categories', {
+        const response = await api(endpoints.categories.create(), {
             method: 'POST',
             body: JSON.stringify({ name, auth_required: authRequired, links: [] })
         });
@@ -583,7 +493,7 @@ async function deleteCategory(name) {
     if (!confirm(`确定要删除分类 "${name}" 及其所有链接吗？`)) return;
 
     try {
-        const response = await api(`/api/v1/categories/${encodeURIComponent(name)}`, {
+        const response = await api(endpoints.categories.detail(name), {
             method: 'DELETE'
         });
 
@@ -608,17 +518,6 @@ async function deleteCategory(name) {
     } catch (error) {
         showToast(error.message, 'error');
     }
-}
-
-// 弹窗控制
-function openModal(id) {
-    document.getElementById(id).classList.add('active');
-    document.body.classList.add('modal-open');
-}
-
-function closeModal(id) {
-    document.getElementById(id).classList.remove('active');
-    document.body.classList.remove('modal-open');
 }
 
 function openEditModal(data) {
@@ -667,7 +566,7 @@ async function fetchFaviconGeneric(url, iconInputId, statusElId) {
         statusEl.textContent = '正在获取图标...';
         statusEl.style.color = 'var(--text-muted)';
 
-        const response = await api('/api/v1/favicon/fetch', {
+        const response = await api(endpoints.favicon.fetch(), {
             method: 'POST',
             body: JSON.stringify({ url })
         });
@@ -694,7 +593,7 @@ async function fetchFaviconGeneric(url, iconInputId, statusElId) {
 // 更新分类
 async function updateCategory(oldName, newName, authRequired) {
     try {
-        const response = await api(`/api/v1/categories/${encodeURIComponent(oldName)}`, {
+        const response = await api(endpoints.categories.detail(oldName), {
             method: 'PUT',
             body: JSON.stringify({ name: newName, auth_required: authRequired })
         });
@@ -730,7 +629,7 @@ function openEditCategoryModal(name, authRequired) {
 // 调整链接顺序
 async function reorderLink(id, direction) {
     try {
-        const response = await api(`/api/v1/links/${id}/reorder`, {
+        const response = await api(endpoints.links.reorder(id), {
             method: 'POST',
             body: JSON.stringify({ direction })
         });
@@ -744,7 +643,7 @@ async function reorderLink(id, direction) {
 // 加载站点设置
 async function loadSettings() {
     try {
-        const response = await fetch('/api/v1/settings');
+        const response = await api(endpoints.settings.get());
         const settings = await response.json();
 
         // 保存到状态
@@ -807,9 +706,9 @@ async function loadSettings() {
 }
 
 // 保存站点设置
-async function saveSettings(icp, copyright, articlePageTitle, siteTitle, linkSize, protectedPaths, analyticsCode, githubUrl, timezone) {
+async function saveSettings(icp, copyright, articlePageTitle, siteTitle, linkSize, protectedPaths, githubUrl, timezone) {
     try {
-        const response = await api('/api/v1/settings', {
+        const response = await api(endpoints.settings.update(), {
             method: 'PUT',
             body: JSON.stringify({
                 icp,
@@ -818,7 +717,6 @@ async function saveSettings(icp, copyright, articlePageTitle, siteTitle, linkSiz
                 site_title: siteTitle,
                 link_size: linkSize,
                 protected_article_paths: protectedPaths,
-                analytics_code: analyticsCode,
                 github_url: githubUrl,
                 timezone: timezone
             })
@@ -839,20 +737,10 @@ async function saveSettings(icp, copyright, articlePageTitle, siteTitle, linkSiz
 document.addEventListener('DOMContentLoaded', () => {
     // 初始化
     initTheme();
+    initModalSystem();
     updateUI();
     loadLinks();
     loadSettings();
-
-    // 键盘支持：ESC 关闭模态框
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            const activeModal = document.querySelector('.modal.active');
-            if (activeModal) {
-                activeModal.classList.remove('active');
-                document.body.classList.remove('modal-open');
-            }
-        }
-    });
 
     // 登录按钮
     document.getElementById('login-btn')?.addEventListener('click', () => {
@@ -861,7 +749,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // 登出按钮
-    document.getElementById('logout-btn')?.addEventListener('click', logout);
+    document.getElementById('logout-btn')?.addEventListener('click', () => logout());
 
     // 管理按钮
     document.getElementById('manage-btn')?.addEventListener('click', async () => {
@@ -875,7 +763,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const linkSizeSelect = document.getElementById('link-size');
         const timezoneSelect = document.getElementById('timezone');
         const protectedPathsInput = document.getElementById('protected-paths');
-        const analyticsCodeInput = document.getElementById('analytics-code');
         const jwtTokenDisplay = document.getElementById('jwt-token-display');
         if (siteTitleInput) siteTitleInput.value = settings.site_title || '个人主页导航';
         if (articleTitleInput) articleTitleInput.value = settings.article_page_title || '文章';
@@ -885,7 +772,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (linkSizeSelect) linkSizeSelect.value = settings.link_size || 'medium';
         if (timezoneSelect) timezoneSelect.value = settings.timezone || 'Asia/Shanghai';
         if (protectedPathsInput) protectedPathsInput.value = (settings.protected_article_paths || []).join(',');
-        if (analyticsCodeInput) analyticsCodeInput.value = settings.analytics_code || '';
 
         // Security: Hide JWT token by default
         if (jwtTokenDisplay) {
@@ -938,25 +824,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 toggleBtn.textContent = '隐藏 Token';
             }
         }
-    });
-
-    // 关闭弹窗
-    document.querySelectorAll('.modal .close').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const modal = btn.closest('.modal');
-            modal.classList.remove('active');
-            document.body.classList.remove('modal-open');
-        });
-    });
-
-    // 点击弹窗外部关闭
-    document.querySelectorAll('.modal').forEach(modal => {
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.classList.remove('active');
-                document.body.classList.remove('modal-open');
-            }
-        });
     });
 
     // 登录表单
@@ -1069,14 +936,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const timezone = document.getElementById('timezone').value || 'Asia/Shanghai';
         const protectedPathsStr = document.getElementById('protected-paths').value || '';
         const protectedPaths = protectedPathsStr.split(',').map(p => p.trim()).filter(p => p);
-        const analyticsCode = document.getElementById('analytics-code').value || '';
-        saveSettings(icp, copyright, articleTitle, siteTitle, linkSize, protectedPaths, analyticsCode, githubUrl, timezone);
+        saveSettings(icp, copyright, articleTitle, siteTitle, linkSize, protectedPaths, githubUrl, timezone);
     });
 
     // 导出导航数据
     document.getElementById('export-links-btn')?.addEventListener('click', async () => {
         try {
-            const response = await api('/api/v1/links/export');
+            const response = await api(endpoints.links.exportData());
             if (!response.ok) throw new Error('导出失败');
             const data = await response.json();
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1124,7 +990,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // 加载访问记录
 async function loadVisits() {
     try {
-        const response = await api('/api/v1/logs/visits?limit=200');
+        const response = await api(endpoints.logs.visits(200));
         if (!response.ok) {
             throw new Error('加载失败');
         }
@@ -1163,7 +1029,7 @@ async function clearVisits() {
     if (!confirm('确定要清空所有访问记录吗？')) return;
 
     try {
-        const response = await api('/api/v1/logs/visits', { method: 'DELETE' });
+        const response = await api(endpoints.logs.clearVisits(), { method: 'DELETE' });
         if (!response.ok) {
             throw new Error('清空失败');
         }
@@ -1177,7 +1043,7 @@ async function clearVisits() {
 // 加载更新记录
 async function loadUpdates() {
     try {
-        const response = await api('/api/v1/logs/updates?limit=200');
+        const response = await api(endpoints.logs.updates(200));
         if (!response.ok) {
             throw new Error('加载失败');
         }
@@ -1221,7 +1087,7 @@ async function clearUpdates() {
     if (!confirm('确定要清空所有更新记录吗？')) return;
 
     try {
-        const response = await api('/api/v1/logs/updates', { method: 'DELETE' });
+        const response = await api(endpoints.logs.clearUpdates(), { method: 'DELETE' });
         if (!response.ok) {
             throw new Error('清空失败');
         }
@@ -1269,7 +1135,7 @@ async function importLinks(format) {
         const text = await file.text();
         const data = JSON.parse(text);
 
-        const response = await api('/api/v1/links/import', {
+        const response = await api(endpoints.links.importData(), {
             method: 'POST',
             body: JSON.stringify({ data, format })
         });
@@ -1361,7 +1227,7 @@ function initDragAndDrop() {
 // 批量排序链接
 async function batchReorderLinks(linkIds) {
     try {
-        const response = await api('/api/v1/links/reorder/batch', {
+        const response = await api(endpoints.links.batchReorder(), {
             method: 'POST',
             body: JSON.stringify({ ids: linkIds })
         });
@@ -1381,7 +1247,7 @@ async function batchReorderLinks(linkIds) {
 // 批量排序分类
 async function batchReorderCategories(categoryNames) {
     try {
-        const response = await api('/api/v1/categories/reorder/batch', {
+        const response = await api(endpoints.categories.batchReorder(), {
             method: 'POST',
             body: JSON.stringify({ ids: categoryNames })
         });

@@ -2,15 +2,14 @@
 import asyncio
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from alembic import context
-
-from app.database import Base
 from app.config import get_settings
-from app.models import Category, Link, Setting, VisitLog, UpdateLog
+from app.database import Base
+from app.models import Category, Link, SiteSettings, TokenBlacklist, UpdateLog, VisitLog
 
 config = context.config
 settings = get_settings()
@@ -31,13 +30,22 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        compare_type=True,
+        compare_server_default=True,
+        render_as_batch="sqlite" in url,
     )
 
     with context.begin_transaction():
         context.run_migrations()
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        compare_type=True,
+        compare_server_default=True,
+        render_as_batch="sqlite" in settings.database_url,
+    )
 
     with context.begin_transaction():
         context.run_migrations()

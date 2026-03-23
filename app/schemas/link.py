@@ -1,6 +1,6 @@
 """Link schemas"""
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class LinkBase(BaseModel):
     title: str
@@ -18,9 +18,7 @@ class LinkUpdate(BaseModel):
 
 class LinkResponse(LinkBase):
     id: str
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class CategoryWithLinks(BaseModel):
     name: str

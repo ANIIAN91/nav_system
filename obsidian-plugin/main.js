@@ -4,6 +4,7 @@
  */
 
 const { Plugin, PluginSettingTab, Setting, Notice, requestUrl } = require('obsidian');
+const navApi = require('./api');
 
 const DEFAULT_SETTINGS = {
     apiUrl: 'http://localhost:8001',
@@ -120,8 +121,10 @@ class NavSystemSyncPlugin extends Plugin {
         }
 
         // 简单的路径输入（实际可以用 Modal）
-        const customPath = prompt('输入保存路径（如 notes/my-article）:',
-            this.settings.defaultPath + '/' + activeFile.basename);
+        const customPath = prompt(
+            '输入保存路径（如 notes/folder/my-article）:',
+            this.getDefaultPath(activeFile)
+        );
 
         if (customPath) {
             await this.uploadFile(activeFile, false, customPath);
@@ -209,14 +212,11 @@ class NavSystemSyncPlugin extends Plugin {
             };
 
             // 发送请求
-            const response = await requestUrl({
-                url: `${this.settings.apiUrl}/api/v1/articles/sync`,
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.settings.jwtToken}`
-                },
-                body: JSON.stringify(requestData)
+            const response = await navApi.syncArticle({
+                requestUrl,
+                baseUrl: this.settings.apiUrl,
+                token: this.settings.jwtToken,
+                payload: requestData
             });
 
             if (response.status === 200 || response.status === 201) {
@@ -304,13 +304,17 @@ class NavSystemSyncPlugin extends Plugin {
     }
 
     // 获取默认保存路径
+    normalizePath(path) {
+        return (path || '')
+            .replace(/\\/g, '/')
+            .replace(/^\/+|\/+$/g, '');
+    }
+
     getDefaultPath(file) {
-        // 使用文件在 vault 中的相对路径，或者默认路径 + 文件名
-        const relativePath = file.path.replace(/\.md$/, '');
-        if (this.settings.defaultPath) {
-            return `${this.settings.defaultPath}/${file.basename}`;
-        }
-        return relativePath;
+        // 保留 vault 内的相对目录结构，defaultPath 仅作为根前缀
+        const relativePath = this.normalizePath(file.path.replace(/\.md$/, ''));
+        const defaultPath = this.normalizePath(this.settings.defaultPath);
+        return [defaultPath, relativePath].filter(Boolean).join('/');
     }
 }
 
@@ -331,7 +335,7 @@ class NavSystemSyncSettingTab extends PluginSettingTab {
             .setName('API 地址')
             .setDesc('Nav System 后端 API 地址')
             .addText(text => text
-                .setPlaceholder('http://localhost:8000')
+                .setPlaceholder('http://localhost:8001')
                 .setValue(this.plugin.settings.apiUrl)
                 .onChange(async (value) => {
                     this.plugin.settings.apiUrl = value;
@@ -351,7 +355,7 @@ class NavSystemSyncSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('默认保存路径')
-            .setDesc('文章默认保存的目录路径')
+            .setDesc('文章默认保存的根目录前缀，会保留 vault 内的相对路径结构')
             .addText(text => text
                 .setPlaceholder('notes')
                 .setValue(this.plugin.settings.defaultPath)
@@ -378,12 +382,10 @@ class NavSystemSyncSettingTab extends PluginSettingTab {
                 .setButtonText('测试')
                 .onClick(async () => {
                     try {
-                        const response = await requestUrl({
-                            url: `${this.plugin.settings.apiUrl}/api/v1/auth/me`,
-                            method: 'GET',
-                            headers: {
-                                'Authorization': `Bearer ${this.plugin.settings.jwtToken}`
-                            }
+                        const response = await navApi.checkMe({
+                            requestUrl,
+                            baseUrl: this.plugin.settings.apiUrl,
+                            token: this.plugin.settings.jwtToken
                         });
 
                         if (response.status === 200) {

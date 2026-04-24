@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+from contextlib import asynccontextmanager
 
 import pytest
 import pytest_asyncio
@@ -80,11 +81,20 @@ async def client(test_db):
     async def override_get_db():
         yield test_db
 
+    @asynccontextmanager
+    async def override_session_factory():
+        yield test_db
+
+    original_session_factory = app.state.session_factory
     app.dependency_overrides[get_db] = override_get_db
+    app.state.session_factory = override_session_factory
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as async_client:
-        yield async_client
-    app.dependency_overrides.clear()
+    try:
+        async with AsyncClient(transport=transport, base_url="http://test") as async_client:
+            yield async_client
+    finally:
+        app.state.session_factory = original_session_factory
+        app.dependency_overrides.clear()
 
 
 @pytest.fixture

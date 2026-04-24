@@ -1,51 +1,80 @@
-﻿# Nav System
+# Nav System
 
-基于 `FastAPI + Jinja2 + Vanilla JS + SQLite` 的个人导航与 Markdown 文章系统。
+![Python](https://img.shields.io/badge/Python-3.11-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.104-009688)
+![SQLite](https://img.shields.io/badge/SQLite-Alembic-07405E)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ED)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-[Demo](https://navsystem-navsystem.up.railway.app/) | 预览账号: `admin / admin123`
+Nav System 是一个基于 `FastAPI + Jinja2 + Vanilla JS + SQLite` 的个人导航与 Markdown 文章系统。它适合部署为个人主页、知识库入口、书签导航站，支持分类链接、文章管理、目录保护、访问日志、Docker 部署和 Obsidian/脚本同步。
 
-## 功能
+- Demo: <https://navsystem-navsystem.up.railway.app/>
+- 预览账号: `admin / admin123`
+- Docker 镜像: `aniian/nav-system:latest`
 
-- 导航链接、分类、拖拽排序、导入导出
-- Markdown 文章浏览、编辑、目录管理
-- 目录级文章保护
+## 目录
+
+- [特性](#特性)
+- [快速开始](#快速开始)
+- [配置](#配置)
+- [本地开发](#本地开发)
+- [Docker 部署](#docker-部署)
+- [数据与迁移](#数据与迁移)
+- [同步客户端](#同步客户端)
+- [API 约定](#api-约定)
+- [项目结构](#项目结构)
+- [测试与 CI](#测试与-ci)
+- [安全与隐私](#安全与隐私)
+- [维护建议](#维护建议)
+- [License](#license)
+
+## 特性
+
+- 分类导航、链接管理、拖拽排序、导入导出
+- Markdown 文章浏览、编辑、目录管理和同步
+- 目录级文章保护，受保护目录只对登录用户开放
 - 管理后台设置、访问日志、更新日志
 - JWT 登录、服务端登出撤销、登录限流
-- Obsidian 插件同步和 Python 批量同步脚本
-
-## API 约定
-
-所有接口统一使用 `/api/v1` 前缀。
-
-常用分组：
-
-- 认证：`/api/v1/auth/*`
-- 导航：`/api/v1/links/*`、`/api/v1/categories/*`
-- 文章：`/api/v1/articles/*`、`/api/v1/folders/*`
-- 设置与日志：`/api/v1/settings`、`/api/v1/settings/admin`、`/api/v1/logs/*`
-
-约束：
-
-- `GET /api/v1/settings` 是公开接口，只返回页面展示需要的站点设置
-- `GET /api/v1/settings/admin` 需要有效 JWT，返回管理弹窗需要的完整设置
-- 设置写入、日志、导入导出、文章与目录管理接口都需要有效 JWT
+- 自动 favicon 获取和本地图标缓存
+- Obsidian 插件同步与 Python 批量同步脚本
+- Docker 入口自动执行 Alembic 数据库迁移
 
 ## 快速开始
 
-- 镜像：`aniian/nav-system:latest`
-- 容器内监听端口：`8000`
-- 示例宿主机端口：`8001`
-- 数据持久化目录：`articles/`、`data/`、`static/icons/`
-
-### 1. 配置环境变量
-
-复制模板：
+### 使用 Docker Compose
 
 ```bash
 cp .env.example .env
+mkdir -p articles data static/icons
+docker compose up -d --build
 ```
 
-最少需要：
+启动后访问：
+
+```text
+http://localhost:8001
+```
+
+### 使用已发布镜像
+
+```bash
+cp .env.example .env
+mkdir -p articles data static/icons
+
+docker run -d \
+  --name nav-system \
+  -p 8001:8000 \
+  --env-file .env \
+  -v $(pwd)/articles:/app/articles \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/static/icons:/app/static/icons \
+  --restart unless-stopped \
+  aniian/nav-system:latest
+```
+
+## 配置
+
+最少需要在 `.env` 中配置：
 
 ```env
 SECRET_KEY=generate-a-random-32-char-string-here
@@ -53,31 +82,75 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=change_this_password
 ```
 
-也可以改用 `ADMIN_PASSWORD_HASH`。
+也可以使用 `ADMIN_PASSWORD_HASH` 代替明文 `ADMIN_PASSWORD`。
 
-### 2. 准备持久化目录
+常用环境变量：
 
-这些目录会挂载到容器中，删除容器后数据仍然保留：
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `DATABASE_URL` | `sqlite+aiosqlite:///./data/nav_system.db` | 数据库连接字符串 |
+| `SECRET_KEY` | 无 | JWT 签名密钥，生产环境必须使用随机强密钥 |
+| `ADMIN_USERNAME` | 无 | 管理员用户名 |
+| `ADMIN_PASSWORD` | 无 | 管理员明文密码 |
+| `ADMIN_PASSWORD_HASH` | 无 | 管理员密码哈希，优先用于生产部署 |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | 登录 token 有效期 |
+| `MAX_LOGIN_ATTEMPTS` | `5` | 登录窗口内最大失败次数 |
+| `LOGIN_WINDOW_SECONDS` | `300` | 登录限流统计窗口 |
+| `LOCKOUT_SECONDS` | `900` | 登录锁定时间 |
+| `ENABLE_LOG_CLEANUP` | `true` | 是否启用应用内日志清理任务 |
+| `LOG_CLEANUP_INTERVAL_SECONDS` | `21600` | 日志清理间隔，默认 6 小时 |
+| `MAX_VISIT_RECORDS` | `1000` | 访问日志保留数量 |
+| `MAX_UPDATE_RECORDS` | `500` | 更新日志保留数量 |
+| `SKIP_MIGRATIONS` | `false` | Docker 入口是否跳过 Alembic 迁移 |
 
-- `./articles`：Markdown 文章
-- `./data`：SQLite 数据库
-- `./static/icons`：站点图标缓存
-
-如果目录还不存在，先创建：
+## 本地开发
 
 ```bash
-mkdir -p articles data static/icons
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+cp .env.example .env
+python -m alembic upgrade head
+uvicorn app.main:app --reload
 ```
 
-### 3. 拉取镜像
+默认开发地址：
+
+```text
+http://localhost:8000
+```
+
+运行测试：
+
+```bash
+pytest
+```
+
+## Docker 部署
+
+容器内监听端口是 `8000`。推荐挂载三个目录：
+
+| 宿主机目录 | 容器目录 | 用途 |
+| --- | --- | --- |
+| `./articles` | `/app/articles` | Markdown 文章 |
+| `./data` | `/app/data` | SQLite 数据库和备份 |
+| `./static/icons` | `/app/static/icons` | favicon 缓存 |
+
+常用管理命令：
+
+```bash
+docker logs -f nav-system
+docker stop nav-system
+docker start nav-system
+docker rm -f nav-system
+```
+
+升级镜像：
 
 ```bash
 docker pull aniian/nav-system:latest
-```
-
-### 4. 启动容器
-
-```bash
+docker rm -f nav-system
 docker run -d \
   --name nav-system \
   -p 8001:8000 \
@@ -89,22 +162,11 @@ docker run -d \
   aniian/nav-system:latest
 ```
 
-参数说明：
+挂载目录不变时，升级不会迁移或覆盖文章、数据库和图标缓存。新容器启动时会自动执行最新数据库迁移。
 
-- `-d`：后台运行容器
-- `--name nav-system`：固定容器名，方便后续日志、重启、升级操作
-- `-p 8001:8000`：把宿主机 `8001` 映射到容器内 `8000`
-- `--env-file .env`：从项目目录下的 `.env` 读取环境变量
-- `-v ...:/app/articles`：持久化文章目录
-- `-v ...:/app/data`：持久化 SQLite 数据库
-- `-v ...:/app/static/icons`：持久化图标缓存
-- `--restart unless-stopped`：宿主机重启后自动拉起
+## 数据与迁移
 
-启动完成后访问：`http://localhost:8001`
-
-### 5. 首次启动会做什么
-
-容器入口会默认先执行：
+数据库 schema 由 Alembic 管理。Docker 入口默认执行：
 
 ```bash
 alembic upgrade head
@@ -112,61 +174,12 @@ alembic upgrade head
 
 这意味着：
 
-- 空库首次启动时会自动初始化 schema
-- 老版本升级时会自动执行数据库迁移
-- 只有在迁移已经由外部流程保证时，才应该显式设置 `SKIP_MIGRATIONS=true`
+- 空库首次启动会自动创建表结构
+- 旧版本升级会自动执行迁移
+- 应用启动阶段不再使用 `create_all()` 隐式建表
+- 只有外部流程已经保证迁移时，才应该设置 `SKIP_MIGRATIONS=true`
 
-应用启动阶段不再使用 `create_all()` 自动建表，schema 统一由 Alembic 管理。
-
-### 6. 常用容器管理
-
-查看日志：
-
-```bash
-docker logs -f nav-system
-```
-
-停止容器：
-
-```bash
-docker stop nav-system
-```
-
-启动容器：
-
-```bash
-docker start nav-system
-```
-
-删除容器：
-
-```bash
-docker rm -f nav-system
-```
-
-### 7. 升级方式
-
-保留挂载目录不变时，升级只需要替换容器，不需要迁移文章和数据库文件：
-
-```bash
-docker pull aniian/nav-system:latest
-docker rm -f nav-system
-docker run -d \
-  --name nav-system \
-  -p 8001:8000 \
-  --env-file .env \
-  -v $(pwd)/articles:/app/articles \
-  -v $(pwd)/data:/app/data \
-  -v $(pwd)/static/icons:/app/static/icons \
-  --restart unless-stopped \
-  aniian/nav-system:latest
-```
-
-因为数据库和文章目录都在宿主机挂载中，新容器启动时会直接复用旧数据，并自动执行最新迁移。
-
-## 设置模型
-
-站点设置已集中到单行 typed 表 `site_settings`，主要字段包括：
+当前设置模型使用单行 typed 表 `site_settings`，主要字段包括：
 
 - `site_title`
 - `article_page_title`
@@ -177,47 +190,19 @@ docker run -d \
 - `github_url`
 - `protected_article_paths_json`
 
-对应读写入口是 `app/services/settings.py`。
+旧的 key-value `settings` 表、`app/models/setting.py` 和 `app/schemas/setting.py` 兼容层已移除。旧部署升级到当前版本时，需要执行 `alembic upgrade head`，让迁移链完成数据迁移和旧表删除。
 
-公开设置接口不会返回 `protected_article_paths_json` 对应的受保护目录列表。管理弹窗通过需要登录的 `/api/v1/settings/admin` 读取完整设置。
-
-旧的 key-value `settings` 表、`app/models/setting.py` 和 `app/schemas/setting.py` 兼容层已移除。旧部署升级到当前版本时，需要先执行 `alembic upgrade head`，让 `20260324_01` 完成数据迁移，再由 `20260324_02` 删除旧表。如果数据库里同时存在已写入的 `site_settings` 和旧 `settings`，迁移会显式拒绝继续，避免在双写状态下静默丢失配置。
-
-## 日志保留策略
-
-页面请求路径上只做单次插入，不再在热路径里做 `count + delete`。
-
-默认 Docker 容器会在应用启动后先执行一次日志保留清理，并在后台按固定间隔重复执行。
-
-默认参数：
-
-- `ENABLE_LOG_CLEANUP=true`
-- `LOG_CLEANUP_INTERVAL_SECONDS=21600`（每 6 小时一次）
-- `MAX_VISIT_RECORDS=1000`
-- `MAX_UPDATE_RECORDS=500`
-
-如果已经通过外部调度执行清理脚本，可以显式设置 `ENABLE_LOG_CLEANUP=false` 关闭应用内定时清理。
-
-手动清理入口仍然保留：
-
-```bash
-docker exec nav-system python scripts/cleanup_logs.py
-docker exec nav-system python scripts/cleanup_logs.py --max-visits 2000 --max-updates 1000
-```
-
-说明：
-
-- 应用内定时清理是默认 Docker 运行路径
-- `scripts/cleanup_logs.py` 适合手动补跑或由宿主机外部调度执行
-- 清理结果会输出删除数量和当前保留数量，可从脚本 stdout 或应用日志观察
+如果数据库中同时存在已写入的 `site_settings` 和旧 `settings`，迁移会拒绝继续，避免在双写状态下静默丢失配置。
 
 ## 同步客户端
 
 ### Python 批量同步
 
-脚本入口：`scripts/sync_articles.py`
+脚本入口：
 
-共享 API 契约：`scripts/nav_client.py`
+```text
+scripts/sync_articles.py
+```
 
 示例：
 
@@ -230,17 +215,23 @@ python scripts/sync_articles.py \
 
 常用参数：
 
-- `--target`：目标目录前缀
-- `--pattern`：自定义匹配模式
-- `--exclude`：排除模式
-- `--force`：强制重传
-- `--test`：仅测试连接
+| 参数 | 说明 |
+| --- | --- |
+| `--target` | 目标目录前缀 |
+| `--pattern` | 自定义匹配模式 |
+| `--exclude` | 排除模式 |
+| `--force` | 强制重传 |
+| `--test` | 仅测试连接 |
+
+共享 API 契约在 `scripts/nav_client.py` 中维护。
 
 ### Obsidian 插件
 
-插件目录：`obsidian-plugin/`
+插件目录：
 
-共享 API 契约：`obsidian-plugin/api.js`
+```text
+obsidian-plugin/
+```
 
 配置项：
 
@@ -249,121 +240,103 @@ python scripts/sync_articles.py \
 - 默认同步路径
 - 自动同步开关
 
-Token 可在首页管理弹窗的“导入导出”页签中复制。前端现在只提供“记住用户名”，不再保存密码。
+共享 API 契约在 `obsidian-plugin/api.js` 中维护。Token 可在首页管理弹窗的“导入导出”页签中复制。
 
-## 前端结构
+## API 约定
 
-```text
-static/js/
-  core/
-    auth.js
-    endpoints.js
-    http.js
-    state.js
-  ui/
-    modal.js
-    theme.js
-    toast.js
-  pages/
-    home.js
-    home/
-      article-manager.js
-      article-sheet.js
-```
+所有接口统一使用 `/api/v1` 前缀。
 
-说明：
+| 分组 | 路径 |
+| --- | --- |
+| 认证 | `/api/v1/auth/*` |
+| 导航 | `/api/v1/links/*`、`/api/v1/categories/*` |
+| 文章 | `/api/v1/articles/*`、`/api/v1/folders/*` |
+| favicon | `/api/v1/favicon/*` |
+| 设置 | `/api/v1/settings`、`/api/v1/settings/admin` |
+| 日志 | `/api/v1/logs/*` |
 
-- `core/endpoints.js` 是浏览器端接口路径唯一来源
-- `core/http.js` 负责通用请求、鉴权头和 401 回调
-- `pages/home.js` 负责首页编排，文章浮页和文章管理已拆到 `pages/home/*`
-- 独立 `/articles` 页面已退场，旧链接会重定向回首页
+访问约束：
 
-## 后端结构
+- `GET /api/v1/settings` 是公开接口，只返回页面展示需要的站点设置
+- `GET /api/v1/settings/admin` 需要有效 JWT，返回管理弹窗需要的完整设置
+- 公开设置接口不会返回 `protected_article_paths_json` 对应的受保护目录列表
+- 设置写入、日志、导入导出、文章与目录管理接口都需要有效 JWT
 
-```text
-app/
-  api/
-    dependencies/
-      auth.py
-    http.py
-    router.py
-  application/
-    use_cases/
-      ...
-  core/
-    pathing.py
-    urls.py
-  domain/
-    ...
-  infrastructure/
-    ...
-  models/
-    site_settings.py
-  routers/
-    articles.py
-    auth.py
-    categories.py
-    folders.py
-    links.py
-    logs.py
-    settings.py
-  services/
-    articles.py
-    auth.py
-    folders.py
-    rate_limit.py
-    settings.py
-  web/
-    pages.py
-```
-
-说明：
-
-- `api/router.py` 统一挂载 `/api/v1` 路由，`api/http.py` 处理 API 响应与错误映射
-- `api/dependencies/*` 放置跨路由依赖
-- `routers/*` 负责 API 参数解析、依赖注入和响应映射
-- `web/pages.py` 负责 Jinja 页面路由、旧页面重定向和页面访问日志
-- `application/use_cases/*`、`domain/*`、`infrastructure/*` 承接逐步拆分后的业务编排、领域对象和基础设施适配
-- `core/pathing.py`、`core/urls.py` 统一处理路径和 API URL 规范
-- `services/articles.py`、`services/folders.py` 接管文件系统操作
-- `services/auth.py` 使用 `RateLimiter` 抽象
-- `services/settings.py` 负责 typed settings、默认值和缓存
-
-## 测试与 CI
-
-CI 当前会校验：
-
-- 空库可以直接执行 `alembic upgrade head`
-- 测试通过
-- 客户端业务代码里不重新硬编码 `/api/v1/...`
-- 首页模板不再回退到旧 `static/js/main.js`
-- 文章页模板没有重新引入大段内联脚本
-- legacy settings model/schema 不被重新引入
-
-## 目录概览
+## 项目结构
 
 ```text
 nav_system/
 ├── app/
-├── alembic/
-├── articles/
-├── data/
-├── obsidian-plugin/
-├── scripts/
-├── static/
-├── templates/
-├── tests/
+│   ├── api/                 # API 注册、依赖和错误响应映射
+│   ├── application/         # 用例层和端口定义
+│   ├── core/                # 路径、URL 等共享基础规则
+│   ├── domain/              # 领域对象和领域服务
+│   ├── infrastructure/      # 仓储与基础设施适配
+│   ├── models/              # SQLAlchemy 模型
+│   ├── routers/             # FastAPI API 路由
+│   ├── services/            # 业务服务与兼容服务
+│   └── web/                 # Jinja 页面路由
+├── alembic/                 # 数据库迁移
+├── articles/                # Markdown 文章目录
+├── obsidian-plugin/         # Obsidian 同步插件
+├── scripts/                 # 同步、备份、日志清理脚本
+├── static/                  # 前端静态资源
+├── templates/               # Jinja 模板
+├── tests/                   # Pytest 测试
 ├── Dockerfile
-└── REFACTOR_CHECKLIST.md
+└── docker-compose.yml
 ```
+
+前端入口：
+
+```text
+static/js/
+├── core/                    # auth、http、endpoints、state
+├── ui/                      # modal、theme、toast
+└── pages/
+    ├── home.js
+    └── home/                # 文章浮页和文章管理模块
+```
+
+## 测试与 CI
+
+CI 当前校验：
+
+- 空库可以直接执行 `alembic upgrade head`
+- 测试通过
+- 客户端业务代码不重新硬编码 `/api/v1/...`
+- 首页模板不回退到旧 `static/js/main.js`
+- 独立文章页前端不被重新引入
+- legacy settings model/schema 不被重新引入
+
+本地执行：
+
+```bash
+pytest
+```
+
+## 安全与隐私
+
+- 生产环境必须更换 `SECRET_KEY` 和管理员密码
+- 推荐使用 `ADMIN_PASSWORD_HASH`，减少明文密码暴露面
+- 生产环境建议放在 HTTPS 反向代理后
+- 不要提交真实 `.env`、数据库、个人文章、备份文件或图标缓存
+- 默认 `.gitignore` 已排除 `.env`、`data/`、`articles/`、`static/icons/` 和常见密钥文件
+- 前端只提供“记住用户名”，不保存密码
 
 ## 维护建议
 
-- 生产环境请放在 HTTPS 反向代理后
 - 定期备份 `data/` 与 `articles/`
-- 不要提交真实 `.env`、`data/` 数据库、个人文章或 `static/icons/` 缓存；这些路径默认由 `.gitignore` 排除
-- 每次升级前先 `docker pull` 新镜像，再用原有挂载目录重新创建容器
-- 默认应用内日志清理保持开启；只有在外部已有调度时再关闭并改用 `scripts/cleanup_logs.py`
+- 保留 Alembic 迁移链，避免旧部署升级时缺表或丢配置
+- 每次升级前先拉取新镜像，再用原有挂载目录重建容器
+- 默认应用内日志清理保持开启；只有已有外部调度时再关闭
+
+手动清理日志：
+
+```bash
+docker exec nav-system python scripts/cleanup_logs.py
+docker exec nav-system python scripts/cleanup_logs.py --max-visits 2000 --max-updates 1000
+```
 
 ## License
 

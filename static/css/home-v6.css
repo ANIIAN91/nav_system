@@ -95,6 +95,10 @@ body.home-v6 .frame {
 }
 
 body.home-v6 .header.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: wrap;
     margin: 0;
     padding: 18px 26px;
     border-radius: 0;
@@ -110,6 +114,7 @@ body.home-v6 .header.topbar {
 body.home-v6 .brandmark {
     display: inline-flex;
     align-items: baseline;
+    flex: 0 0 auto;
     gap: 8px;
     color: inherit;
     text-decoration: none;
@@ -136,8 +141,8 @@ body.home-v6 .topnav {
     display: flex;
     align-items: center;
     gap: 6px;
-    flex: 1;
-    justify-content: center;
+    flex: 0 0 auto;
+    justify-content: flex-start;
 }
 
 body.home-v6 .tnav {
@@ -170,8 +175,11 @@ body.home-v6 .topright {
     display: flex;
     align-items: center;
     gap: 10px;
+    flex: 1 1 360px;
     flex-wrap: wrap;
     justify-content: flex-end;
+    margin-left: auto;
+    min-width: 0;
 }
 
 body.home-v6 .search-box {
@@ -1549,18 +1557,18 @@ body.home-v6 .skeleton-article {
 
 @media (max-width: 1080px) {
     body.home-v6 .header.topbar {
-        flex-wrap: wrap;
-        justify-content: center;
+        justify-content: flex-start;
     }
 
     body.home-v6 .topnav {
-        order: 3;
-        width: 100%;
-        justify-content: center;
+        width: auto;
+        justify-content: flex-start;
     }
 
     body.home-v6 .topright {
+        width: 100%;
         justify-content: center;
+        margin-left: 0;
     }
 }
 

@@ -22,7 +22,13 @@
 - 认证：`/api/v1/auth/*`
 - 导航：`/api/v1/links/*`、`/api/v1/categories/*`
 - 文章：`/api/v1/articles/*`、`/api/v1/folders/*`
-- 设置与日志：`/api/v1/settings`、`/api/v1/logs/*`
+- 设置与日志：`/api/v1/settings`、`/api/v1/settings/admin`、`/api/v1/logs/*`
+
+约束：
+
+- `GET /api/v1/settings` 是公开接口，只返回页面展示需要的站点设置
+- `GET /api/v1/settings/admin` 需要有效 JWT，返回管理弹窗需要的完整设置
+- 设置写入、日志、导入导出、文章与目录管理接口都需要有效 JWT
 
 ## 快速开始
 
@@ -173,6 +179,8 @@ docker run -d \
 
 对应读写入口是 `app/services/settings.py`。
 
+公开设置接口不会返回 `protected_article_paths_json` 对应的受保护目录列表。管理弹窗通过需要登录的 `/api/v1/settings/admin` 读取完整设置。
+
 旧的 key-value `settings` 表、`app/models/setting.py` 和 `app/schemas/setting.py` 兼容层已移除。旧部署升级到当前版本时，需要先执行 `alembic upgrade head`，让 `20260324_01` 完成数据迁移，再由 `20260324_02` 删除旧表。如果数据库里同时存在已写入的 `site_settings` 和旧 `settings`，迁移会显式拒绝继续，避免在双写状态下静默丢失配置。
 
 ## 日志保留策略
@@ -274,14 +282,30 @@ static/js/
 
 ```text
 app/
+  api/
+    dependencies/
+      auth.py
+    http.py
+    router.py
+  application/
+    use_cases/
+      ...
   core/
     pathing.py
+    urls.py
+  domain/
+    ...
+  infrastructure/
+    ...
   models/
     site_settings.py
   routers/
     articles.py
     auth.py
+    categories.py
     folders.py
+    links.py
+    logs.py
     settings.py
   services/
     articles.py
@@ -289,11 +313,18 @@ app/
     folders.py
     rate_limit.py
     settings.py
+  web/
+    pages.py
 ```
 
 说明：
 
-- `routers/*` 负责参数解析、依赖注入和响应映射
+- `api/router.py` 统一挂载 `/api/v1` 路由，`api/http.py` 处理 API 响应与错误映射
+- `api/dependencies/*` 放置跨路由依赖
+- `routers/*` 负责 API 参数解析、依赖注入和响应映射
+- `web/pages.py` 负责 Jinja 页面路由、旧页面重定向和页面访问日志
+- `application/use_cases/*`、`domain/*`、`infrastructure/*` 承接逐步拆分后的业务编排、领域对象和基础设施适配
+- `core/pathing.py`、`core/urls.py` 统一处理路径和 API URL 规范
 - `services/articles.py`、`services/folders.py` 接管文件系统操作
 - `services/auth.py` 使用 `RateLimiter` 抽象
 - `services/settings.py` 负责 typed settings、默认值和缓存
@@ -330,6 +361,7 @@ nav_system/
 
 - 生产环境请放在 HTTPS 反向代理后
 - 定期备份 `data/` 与 `articles/`
+- 不要提交真实 `.env`、`data/` 数据库、个人文章或 `static/icons/` 缓存；这些路径默认由 `.gitignore` 排除
 - 每次升级前先 `docker pull` 新镜像，再用原有挂载目录重新创建容器
 - 默认应用内日志清理保持开启；只有在外部已有调度时再关闭并改用 `scripts/cleanup_logs.py`
 

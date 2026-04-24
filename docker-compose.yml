@@ -18,14 +18,3 @@ services:
       - ./data:/app/data
       - ./static/icons:/app/static/icons
     restart: unless-stopped
-
-  log-cleanup:
-    build: .
-    command: python scripts/cleanup_logs.py
-    profiles:
-      - maintenance
-    env_file:
-      - .env
-    volumes:
-      - ./data:/app/data
-    restart: "no"

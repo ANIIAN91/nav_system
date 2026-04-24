@@ -4,15 +4,9 @@ export const homePageState = {
     token: getToken(),
     username: getUsername(),
     links: { categories: [] },
-    isManageMode: false,
+    articles: [],
     settings: { link_size: "medium", protected_article_paths: [] },
     currentCategory: null,
-};
-
-export const articlePageState = {
-    token: getToken(),
-    currentArticlePath: null,
-    currentArticleContent: null,
-    articles: [],
-    settings: {},
+    currentView: "navigation",
+    searchTerm: "",
 };

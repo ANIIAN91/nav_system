@@ -2,15 +2,54 @@
 import re
 import logging
 from urllib.parse import urlparse, urljoin
-from pathlib import Path
 
 import httpx
 
 from app.config import get_settings
 from app.utils.security import is_safe_url
 
-settings = get_settings()
 logger = logging.getLogger(__name__)
+
+MAX_FAVICON_BYTES = 512 * 1024
+MIN_FAVICON_BYTES = 100
+ALLOWED_ICON_CONTENT_TYPES = {
+    "image/x-icon": ".ico",
+    "image/vnd.microsoft.icon": ".ico",
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
+
+
+def _content_type(response: httpx.Response) -> str:
+    return response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+
+
+def _content_length_too_large(response: httpx.Response) -> bool:
+    try:
+        return int(response.headers.get("content-length", "0")) > MAX_FAVICON_BYTES
+    except ValueError:
+        return False
+
+
+def _validated_icon_extension(response: httpx.Response) -> tuple[str | None, str]:
+    if response.status_code != 200:
+        return None, f"HTTP {response.status_code}"
+    if _content_length_too_large(response):
+        return None, "图标文件过大"
+    if len(response.content) < MIN_FAVICON_BYTES:
+        return None, "内容过小"
+    if len(response.content) > MAX_FAVICON_BYTES:
+        return None, "图标文件过大"
+
+    content_type = _content_type(response)
+    extension = ALLOWED_ICON_CONTENT_TYPES.get(content_type)
+    if extension is None:
+        return None, f"不支持的图标类型: {content_type or 'unknown'}"
+    return extension, ""
+
 
 async def fetch_favicon(url: str) -> dict:
     """Fetch favicon from a website and save it"""
@@ -26,7 +65,7 @@ async def fetch_favicon(url: str) -> dict:
             return {"icon": None, "message": error_msg, "error": True}
 
         base_url = f"{parsed.scheme}://{parsed.netloc}"
-        icons_dir = settings.static_dir / "icons"
+        icons_dir = get_settings().static_dir / "icons"
         icons_dir.mkdir(parents=True, exist_ok=True)
 
         icon_urls = [
@@ -90,16 +129,8 @@ async def fetch_favicon(url: str) -> dict:
                             "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
                         }
                     )
-                    if response.status_code == 200 and len(response.content) > 100:
-                        content_type = response.headers.get("content-type", "")
-                        ext = ".ico"
-                        if "png" in content_type or icon_url.endswith(".png"):
-                            ext = ".png"
-                        elif "svg" in content_type or icon_url.endswith(".svg"):
-                            ext = ".svg"
-                        elif "jpeg" in content_type or "jpg" in content_type:
-                            ext = ".jpg"
-
+                    ext, validation_error = _validated_icon_extension(response)
+                    if ext:
                         filename = parsed.netloc.replace(".", "_").replace(":", "_") + ext
                         filepath = icons_dir / filename
 
@@ -109,7 +140,7 @@ async def fetch_favicon(url: str) -> dict:
                         logger.info(f"Successfully fetched icon from {icon_url} -> {filename}")
                         return {"icon": filename, "message": "图标获取成功"}
                     else:
-                        last_error = f"HTTP {response.status_code} or content too small"
+                        last_error = validation_error
             except httpx.TimeoutException:
                 last_error = "请求超时"
                 logger.warning(f"Timeout while fetching icon from {icon_url}")
@@ -130,8 +161,9 @@ async def fetch_favicon(url: str) -> dict:
             google_favicon_url = f"https://www.google.com/s2/favicons?domain={parsed.netloc}&sz=128"
             async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
                 response = await client.get(google_favicon_url)
-                if response.status_code == 200 and len(response.content) > 100:
-                    filename = parsed.netloc.replace(".", "_").replace(":", "_") + ".png"
+                ext, validation_error = _validated_icon_extension(response)
+                if ext:
+                    filename = parsed.netloc.replace(".", "_").replace(":", "_") + ext
                     filepath = icons_dir / filename
 
                     with open(filepath, "wb") as f:
@@ -139,6 +171,7 @@ async def fetch_favicon(url: str) -> dict:
 
                     logger.info(f"Successfully fetched icon from Google favicon service -> {filename}")
                     return {"icon": filename, "message": "图标获取成功 (使用 Google 服务)"}
+                last_error = validation_error
         except Exception as e:
             logger.warning(f"Google favicon service also failed: {e}")
 

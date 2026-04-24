@@ -30,3 +30,21 @@ async def test_sync_article_and_fetch(client, auth_headers, isolated_articles_di
     assert article["path"] == "notes/hello.md"
     assert "# Hello" in article["content"]
     assert "Body text" in article["html"]
+
+
+@pytest.mark.asyncio
+async def test_legacy_article_routes_redirect_to_home(client, auth_headers, isolated_articles_dir):
+    response = await client.post(
+        "/api/v1/articles/sync",
+        json={"path": "notes/legacy", "content": "# Legacy"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+
+    list_page = await client.get("/articles", follow_redirects=False)
+    detail_page = await client.get("/articles/notes/legacy.md", follow_redirects=False)
+
+    assert list_page.status_code == 307
+    assert list_page.headers["location"] == "/"
+    assert detail_page.status_code == 307
+    assert detail_page.headers["location"] == "/?article=notes%2Flegacy.md"

@@ -10,7 +10,6 @@ from app.services.auth import (
     get_token_service,
 )
 from app.services.folders import FolderService
-from app.services.link import LinkService
 from app.services.log import LogService
 from app.services.settings import SettingsService
 
@@ -19,7 +18,6 @@ __all__ = [
     "AuthService",
     "CredentialService",
     "FolderService",
-    "LinkService",
     "LogService",
     "SettingsService",
     "TokenService",

@@ -1,12 +1,20 @@
 """Articles routes."""
 
-from typing import Optional
-
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.dependencies.auth import get_current_user, require_auth
+from app.api.http import raise_http_error
+from app.application.errors import ApplicationError
+from app.application.unit_of_work import SqlAlchemyUnitOfWork
+from app.application.use_cases.content import (
+    CreateArticleUseCase,
+    DeleteArticleUseCase,
+    GetArticleUseCase,
+    ListArticlesUseCase,
+    UpdateArticleUseCase,
+)
 from app.database import get_db
-from app.routers.auth import get_current_user, require_auth
 from app.schemas.article import (
     ArticleDetailResponse,
     ArticleListResponse,
@@ -14,47 +22,30 @@ from app.schemas.article import (
     ArticleSyncRequest,
     ArticleUpdateRequest,
 )
-from app.services.articles import ArticleAuthenticationRequiredError, ArticleService
-from app.services.log import LogService
-from app.services.settings import SettingsService
 
 router = APIRouter(prefix="/api/v1/articles", tags=["articles"])
 
 
 @router.get("")
 async def list_articles(
-    current_user: Optional[str] = Depends(get_current_user),
+    current_user: str | None = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ArticleListResponse:
     """Get article list filtered by login status."""
-    site_settings = await SettingsService(db).get_public_settings()
-    articles = await ArticleService().list_articles_async(
-        protected_paths=site_settings.get("protected_article_paths", []),
-        include_protected=current_user is not None,
-    )
-    return {"articles": articles}
+    return await ListArticlesUseCase(SqlAlchemyUnitOfWork(db)).execute(include_protected=current_user is not None)
 
 
 @router.get("/{path:path}")
 async def get_article(
     path: str,
-    current_user: Optional[str] = Depends(get_current_user),
+    current_user: str | None = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ArticleDetailResponse:
     """Get article content."""
-    site_settings = await SettingsService(db).get_public_settings()
     try:
-        return await ArticleService().get_article_async(
-            path,
-            protected_paths=site_settings.get("protected_article_paths", []),
-            allow_protected=current_user is not None,
-        )
-    except ArticleAuthenticationRequiredError as exc:
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return await GetArticleUseCase(SqlAlchemyUnitOfWork(db)).execute(path, allow_protected=current_user is not None)
+    except ApplicationError as exc:
+        raise_http_error(exc)
 
 
 @router.post("/sync")
@@ -65,19 +56,15 @@ async def sync_article(
 ) -> ArticleMutationResponse:
     """Sync article content from external clients."""
     try:
-        result = await ArticleService().sync_article_async(
+        return await CreateArticleUseCase(SqlAlchemyUnitOfWork(db)).execute(
             path=request.path,
             content=request.content,
             title=request.title,
             frontmatter=request.frontmatter,
+            username=username,
         )
-    except ValueError as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
-
-    log_service = LogService(db)
-    await log_service.record_update("add", "article", result["title"] or "", f"路径: {result['path']}", username)
-    await db.commit()
-    return result
+    except ApplicationError as exc:
+        raise_http_error(exc)
 
 
 @router.put("/{path:path}")
@@ -89,16 +76,9 @@ async def update_article(
 ) -> ArticleMutationResponse:
     """Edit article content."""
     try:
-        result = await ArticleService().update_article_async(path, request.content)
-    except ValueError as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    log_service = LogService(db)
-    await log_service.record_update("update", "article", result["title"], f"路径: {result['path']}", username)
-    await db.commit()
-    return {"message": "文章已更新", "path": result["path"], "title": result["title"]}
+        return await UpdateArticleUseCase(SqlAlchemyUnitOfWork(db)).execute(path, request.content, username)
+    except ApplicationError as exc:
+        raise_http_error(exc)
 
 
 @router.delete("/{path:path}")
@@ -109,13 +89,6 @@ async def delete_article(
 ) -> ArticleMutationResponse:
     """Delete article."""
     try:
-        result = await ArticleService().delete_article_async(path)
-    except ValueError as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    log_service = LogService(db)
-    await log_service.record_update("delete", "article", result["title"], f"路径: {result['path']}", username)
-    await db.commit()
-    return {"message": "文章已删除", "path": result["path"], "title": result["title"]}
+        return await DeleteArticleUseCase(SqlAlchemyUnitOfWork(db)).execute(path, username)
+    except ApplicationError as exc:
+        raise_http_error(exc)

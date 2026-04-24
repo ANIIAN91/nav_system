@@ -90,12 +90,15 @@ def build_in_memory_rate_limiter() -> InMemoryRateLimiter:
     )
 
 
-_rate_limiter_backend: RateLimiter = build_in_memory_rate_limiter()
+_rate_limiter_backend: RateLimiter | None = None
 _rate_limiter_proxy = RateLimiterProxy()
 
 
 def get_rate_limiter_backend() -> RateLimiter:
     """Return the active rate-limit backend."""
+    global _rate_limiter_backend
+    if _rate_limiter_backend is None:
+        _rate_limiter_backend = build_in_memory_rate_limiter()
     return _rate_limiter_backend
 
 

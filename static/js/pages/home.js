@@ -8,10 +8,18 @@ import {
     revokeSession,
     setRememberedUsername,
     storeSession,
+    validateStoredSession,
 } from "../core/auth.js";
 import { endpoints } from "../core/endpoints.js";
 import { apiFetch, setUnauthorizedHandler } from "../core/http.js";
 import { homePageState as state } from "../core/state.js";
+import {
+    initArticleManager,
+    loadManageArticles,
+    loadManageFolders,
+    refreshArticleManagerData,
+} from "./home/article-manager.js";
+import { initArticleSheet, maybeOpenArticleFromLocation, openArticleSheet } from "./home/article-sheet.js";
 import { closeModal, initModalSystem, openModal } from "../ui/modal.js";
 import { initTheme, toggleTheme } from "../ui/theme.js";
 import { showToast } from "../ui/toast.js";
@@ -32,7 +40,103 @@ function syncAuthState() {
     state.username = getUsername();
 }
 
-syncAuthState();
+function setStatusTone(element, tone = "muted") {
+    if (!element) {
+        return;
+    }
+    element.classList.remove("is-muted", "is-success", "is-error");
+    element.classList.add(`is-${tone}`);
+}
+
+let unauthorizedLogoutPromise = null;
+
+function getSearchTerm() {
+    return (state.searchTerm || "").trim().toLowerCase();
+}
+
+function articleMatchesSearch(article, searchTerm = getSearchTerm()) {
+    if (!searchTerm) return true;
+    return [article.title, article.category, article.path]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(searchTerm));
+}
+
+function linkMatchesSearch(link, categoryName, searchTerm = getSearchTerm()) {
+    if (!searchTerm) return true;
+    return [link.title, link.url, categoryName]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(searchTerm));
+}
+
+function getFilteredArticles() {
+    const searchTerm = getSearchTerm();
+    return state.articles.filter((article) => articleMatchesSearch(article, searchTerm));
+}
+
+function hasValidToken() {
+    return Boolean(state.token && state.token.trim().length > 0);
+}
+
+function getVisibleCategories() {
+    return state.links.categories.filter((cat) => !cat.auth_required || hasValidToken());
+}
+
+function getRenderableCategories() {
+    const searchTerm = getSearchTerm();
+    const visibleCategories = getVisibleCategories();
+
+    if (searchTerm) {
+        return visibleCategories
+            .map((category) => ({
+                ...category,
+                links: category.links.filter((link) => linkMatchesSearch(link, category.name, searchTerm)),
+            }))
+            .filter((category) => category.links.length > 0);
+    }
+
+    return visibleCategories.filter((cat) => cat.name === state.currentCategory);
+}
+
+function formatDisplayUrl(url) {
+    if (!url) return "";
+    try {
+        const normalized = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(url) ? url : `https://${url}`;
+        const parsed = new URL(normalized);
+        const tail = parsed.pathname && parsed.pathname !== "/" ? parsed.pathname.replace(/\/$/, "") : "";
+        return `${parsed.host}${tail}`;
+    } catch {
+        return String(url).replace(/^https?:\/\//, "");
+    }
+}
+
+function formatArticleDate(timestamp) {
+    if (!timestamp) return "";
+    const date = new Date(timestamp * 1000);
+    if (Number.isNaN(date.getTime())) return "";
+    return new Intl.DateTimeFormat("zh-CN", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).format(date);
+}
+
+function setHomeView(view) {
+    state.currentView = view === "navigation" ? "navigation" : "articles";
+
+    const viewMap = {
+        articles: document.getElementById("home-articles"),
+        navigation: document.getElementById("home-navigation"),
+    };
+
+    Object.entries(viewMap).forEach(([key, element]) => {
+        if (!element) return;
+        element.classList.toggle("hidden", key !== state.currentView);
+    });
+
+    document.querySelectorAll("[data-home-view]").forEach((tab) => {
+        tab.classList.toggle("active", tab.dataset.homeView === state.currentView);
+    });
+}
 
 async function api(url, options = {}) {
     const response = await apiFetch(url, options);
@@ -42,8 +146,34 @@ async function api(url, options = {}) {
     return response;
 }
 
+async function validateInitialSession() {
+    const token = getToken();
+    if (token) {
+        await validateStoredSession(token);
+    }
+    syncAuthState();
+}
+
 setUnauthorizedHandler(async () => {
-    await logout({ revoke: false, silent: true });
+    if (unauthorizedLogoutPromise) {
+        await unauthorizedLogoutPromise;
+        return;
+    }
+    if (!state.token && !getToken()) {
+        return;
+    }
+
+    unauthorizedLogoutPromise = (async () => {
+        clearAuthState();
+        updateUI();
+        await refreshHomeData({ auth: false });
+    })();
+
+    try {
+        await unauthorizedLogoutPromise;
+    } finally {
+        unauthorizedLogoutPromise = null;
+    }
 });
 
 // 时钟
@@ -87,31 +217,50 @@ function updateUI() {
     const usernameDisplay = document.getElementById('username-display');
 
     if (state.token) {
-        loginBtn.style.display = 'none';
-        logoutBtn.style.display = 'block';
-        manageBtn.style.display = 'block';
-        usernameDisplay.style.display = 'inline';
+        loginBtn.hidden = true;
+        logoutBtn.hidden = false;
+        manageBtn.hidden = false;
+        usernameDisplay.hidden = false;
         usernameDisplay.textContent = state.username;
         document.body.classList.add('logged-in');
     } else {
-        loginBtn.style.display = 'block';
-        logoutBtn.style.display = 'none';
-        manageBtn.style.display = 'none';
-        usernameDisplay.style.display = 'none';
+        loginBtn.hidden = false;
+        logoutBtn.hidden = true;
+        manageBtn.hidden = true;
+        usernameDisplay.hidden = true;
+        usernameDisplay.textContent = '';
         document.body.classList.remove('logged-in');
     }
 }
 
 // 加载导航链接
-async function loadLinks() {
+async function loadLinks(options = {}) {
     try {
-        const response = await api(endpoints.links.list());
+        const response = await api(endpoints.links.list(), options);
         state.links = await response.json();
         renderCategoryNav();
         renderLinks();
     } catch (error) {
         console.error('加载链接失败:', error);
     }
+}
+
+async function loadArticles(options = {}) {
+    try {
+        const response = await api(endpoints.articles.list(), options);
+        const data = await response.json();
+        state.articles = data.articles || [];
+        renderArticleCards();
+        await maybeOpenArticleFromLocation(state.articles);
+    } catch (error) {
+        console.error("加载文章失败:", error);
+        state.articles = [];
+        renderArticleCards();
+    }
+}
+
+async function refreshHomeData(options = {}) {
+    await Promise.all([loadLinks(options), loadArticles(options), loadSettings(options)]);
 }
 
 // HTML 转义函数 - 防止 XSS 攻击
@@ -140,11 +289,18 @@ function renderCategoryNav() {
 
     navContainer.innerHTML = '';
 
-    // 过滤可见分类（确保 token 是有效字符串）
-    const hasValidToken = state.token && state.token.trim().length > 0;
-    const visibleCategories = state.links.categories.filter(cat => {
-        return !cat.auth_required || hasValidToken;
-    });
+    const visibleCategories = getVisibleCategories();
+
+    if (visibleCategories.length === 0) {
+        state.currentCategory = null;
+        navContainer.innerHTML = `
+            <div class="empty-state category-empty">
+                <div class="empty-title">暂无可见分类</div>
+                <div class="empty-copy">添加分类后会显示在这里。</div>
+            </div>
+        `;
+        return;
+    }
 
     // 如果当前分类不可见，选择第一个可见分类
     const currentCategoryVisible = visibleCategories.some(cat => cat.name === state.currentCategory);
@@ -171,7 +327,7 @@ function renderCategoryNav() {
         }
 
         // 添加编辑按钮（仅登录状态且为当前分类）
-        if (hasValidToken && state.currentCategory === category.name) {
+        if (hasValidToken() && state.currentCategory === category.name) {
             const editBtn = document.createElement('button');
             editBtn.className = 'category-edit-icon';
             editBtn.innerHTML = '&#9998;';
@@ -204,9 +360,53 @@ function renderCategoryNav() {
     });
 
     // 如果已登录，初始化分类导航栏的拖拽排序
-    if (hasValidToken) {
+    if (hasValidToken()) {
         initCategoryNavDragAndDrop();
     }
+
+}
+
+function renderArticleCards() {
+    const container = document.getElementById("article-grid");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    const filteredArticles = getFilteredArticles();
+
+    if (filteredArticles.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state article-empty">
+                <div class="empty-title">暂无可展示的文章</div>
+                <div class="empty-copy">当前筛选条件下没有文章，或者文章目录还是空的。</div>
+            </div>
+        `;
+        return;
+    }
+
+    filteredArticles.forEach((article) => {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "article-card";
+        card.addEventListener("click", () => {
+            openArticleSheet(article);
+        });
+
+        const category = article.category ? article.category.split("/").filter(Boolean).pop() : "文章";
+        const dateLabel = formatArticleDate(article.created_time);
+        const metaLabel = article.protected ? "私密" : "公开";
+
+        card.innerHTML = `
+            <div class="card-cat">${escapeHtml(category || "文章")}</div>
+            <div class="card-title">${escapeHtml(article.title || "未命名文章")}</div>
+            <div class="card-foot">
+                <div class="card-date">${escapeHtml(dateLabel)}</div>
+                <div class="card-read">${escapeHtml(metaLabel)}</div>
+            </div>
+        `;
+
+        container.appendChild(card);
+    });
 }
 
 // 渲染导航链接
@@ -214,7 +414,6 @@ function renderLinks() {
     const container = document.getElementById('links-container');
     if (!container) return;
 
-    // 隐藏骨架屏
     const skeletonLinks = document.querySelector('.skeleton-links');
     if (skeletonLinks) {
         skeletonLinks.classList.add('hidden');
@@ -222,17 +421,32 @@ function renderLinks() {
 
     container.innerHTML = '';
 
-    // 获取链接大小设置
     const linkSize = state.settings.link_size || 'medium';
+    const searchTerm = getSearchTerm();
+    const categoriesToShow = getRenderableCategories();
 
-    // 过滤要显示的分类
-    const categoriesToShow = state.links.categories.filter(cat => cat.name === state.currentCategory);
+    if (categoriesToShow.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-title">没有匹配的导航项</div>
+                <div class="empty-copy">试试切换分类，或者换一个搜索词。</div>
+            </div>
+        `;
+        updateCategorySelect();
+        return;
+    }
 
-    categoriesToShow.forEach(category => {
+    categoriesToShow.forEach((category) => {
         const categoryEl = document.createElement('div');
         categoryEl.className = 'category';
 
-        // 直接创建链接网格，不再显示分类标题
+        if (searchTerm) {
+            const label = document.createElement("div");
+            label.className = "category-search-label";
+            label.textContent = category.name;
+            categoryEl.appendChild(label);
+        }
+
         const linksGrid = document.createElement('div');
         linksGrid.className = `links-grid size-${linkSize}`;
 
@@ -260,12 +474,22 @@ function renderLinks() {
                 iconDiv.textContent = (link.title || '?').charAt(0);
             }
 
+            const copyDiv = document.createElement("div");
+            copyDiv.className = "link-card-copy";
+
             const titleSpan = document.createElement('span');
             titleSpan.className = 'link-title';
             setTextContent(titleSpan, link.title);
 
+            const urlSpan = document.createElement("span");
+            urlSpan.className = "link-url-preview";
+            setTextContent(urlSpan, formatDisplayUrl(link.url));
+
+            copyDiv.appendChild(titleSpan);
+            copyDiv.appendChild(urlSpan);
+
             linkEl.appendChild(iconDiv);
-            linkEl.appendChild(titleSpan);
+            linkEl.appendChild(copyDiv);
 
             if (state.token) {
                 const editLinkBtn = document.createElement('button');
@@ -286,7 +510,6 @@ function renderLinks() {
         container.appendChild(categoryEl);
     });
 
-    // 绑定编辑按钮事件
     if (state.token) {
         document.querySelectorAll('.edit-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -296,11 +519,9 @@ function renderLinks() {
             });
         });
 
-        // 初始化拖拽排序
         initDragAndDrop();
     }
 
-    // 更新分类下拉框
     updateCategorySelect();
 }
 
@@ -348,8 +569,7 @@ async function login(username, password, rememberUsername) {
         cleanupLegacyCredentialStorage();
 
         updateUI();
-        loadLinks();
-        loadSettings();
+        refreshHomeData();
         closeModal('login-modal');
     } catch (error) {
         document.getElementById('login-error').textContent = error.message;
@@ -397,7 +617,7 @@ async function logout({ revoke = true, silent = false } = {}) {
 
     clearAuthState();
     updateUI();
-    await Promise.all([loadLinks(), loadSettings()]);
+    await refreshHomeData({ auth: false });
     if (!silent) {
         showToast('已登出', 'success');
     }
@@ -552,6 +772,19 @@ function switchTab(tabId) {
     });
 }
 
+function handleManageTabChange(tabId) {
+    switchTab(tabId);
+    if (tabId === 'visit-log') {
+        loadVisits();
+    } else if (tabId === 'article-library') {
+        loadManageArticles();
+    } else if (tabId === 'folder-library') {
+        loadManageFolders();
+    } else if (tabId === 'update-log') {
+        loadUpdates();
+    }
+}
+
 // 从网页获取图标（通用函数）
 async function fetchFaviconGeneric(url, iconInputId, statusElId) {
     const statusEl = document.getElementById(statusElId);
@@ -564,7 +797,7 @@ async function fetchFaviconGeneric(url, iconInputId, statusElId) {
 
     try {
         statusEl.textContent = '正在获取图标...';
-        statusEl.style.color = 'var(--text-muted)';
+        setStatusTone(statusEl, 'muted');
 
         const response = await api(endpoints.favicon.fetch(), {
             method: 'POST',
@@ -579,14 +812,14 @@ async function fetchFaviconGeneric(url, iconInputId, statusElId) {
         if (data.icon) {
             iconInput.value = data.icon;
             statusEl.textContent = '图标获取成功: ' + data.icon;
-            statusEl.style.color = 'var(--success-color)';
+            setStatusTone(statusEl, 'success');
         } else {
             statusEl.textContent = '未找到图标';
-            statusEl.style.color = 'var(--danger-color)';
+            setStatusTone(statusEl, 'error');
         }
     } catch (error) {
         statusEl.textContent = '获取失败: ' + error.message;
-        statusEl.style.color = 'var(--danger-color)';
+        setStatusTone(statusEl, 'error');
     }
 }
 
@@ -641,9 +874,9 @@ async function reorderLink(id, direction) {
 }
 
 // 加载站点设置
-async function loadSettings() {
+async function loadSettings(options = {}) {
     try {
-        const response = await api(endpoints.settings.get());
+        const response = await api(endpoints.settings.get(), options);
         const settings = await response.json();
 
         // 保存到状态
@@ -652,6 +885,21 @@ async function loadSettings() {
         // 更新网站标题
         if (settings.site_title) {
             document.title = settings.site_title;
+        }
+
+        const siteBrandEl = document.getElementById("site-brand");
+        if (siteBrandEl) {
+            siteBrandEl.textContent = settings.site_title || "ANIAN";
+        }
+
+        const articlesViewLabel = document.getElementById("articles-view-label");
+        if (articlesViewLabel) {
+            articlesViewLabel.textContent = settings.article_page_title || "文章";
+        }
+
+        const homeArticlesTitle = document.getElementById("home-articles-title");
+        if (homeArticlesTitle) {
+            homeArticlesTitle.textContent = settings.article_page_title || "文章";
         }
 
         // 更新备案信息显示
@@ -668,18 +916,17 @@ async function loadSettings() {
         if (githubEl && settings.github_url) {
             githubEl.innerHTML = '';
             const githubLink = document.createElement('a');
+            githubLink.className = 'footer-link';
             githubLink.href = isSafeUrl(settings.github_url) ? settings.github_url : '#';
             githubLink.target = '_blank';
             githubLink.rel = 'noopener noreferrer';
-            githubLink.style.color = 'var(--text-muted)';
-            githubLink.style.textDecoration = 'none';
 
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             svg.setAttribute('width', '16');
             svg.setAttribute('height', '16');
             svg.setAttribute('viewBox', '0 0 16 16');
             svg.setAttribute('fill', 'currentColor');
-            svg.style.verticalAlign = 'text-bottom';
+            svg.classList.add('footer-link-icon');
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             path.setAttribute('d', 'M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z');
@@ -702,6 +949,19 @@ async function loadSettings() {
     } catch (error) {
         console.error('加载设置失败:', error);
         return {};
+    }
+}
+
+async function loadAdminSettings() {
+    try {
+        const response = await api(endpoints.settings.admin());
+        const settings = await response.json();
+        state.settings = { ...state.settings, ...settings };
+        return settings;
+    } catch (error) {
+        console.error('加载管理设置失败:', error);
+        showToast('加载管理设置失败: ' + error.message, 'error');
+        return null;
     }
 }
 
@@ -734,13 +994,51 @@ async function saveSettings(icp, copyright, articlePageTitle, siteTitle, linkSiz
 }
 
 // 事件绑定
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // 初始化
     initTheme();
     initModalSystem();
+    initArticleSheet();
+    initArticleManager({
+        refreshHomepage: loadArticles,
+        openArticleSheet,
+    });
+    setHomeView(state.currentView);
+    await validateInitialSession();
     updateUI();
-    loadLinks();
-    loadSettings();
+    await refreshHomeData();
+
+    document.querySelectorAll("[data-home-view]").forEach((tab) => {
+        tab.addEventListener("click", () => {
+            setHomeView(tab.dataset.homeView);
+        });
+    });
+
+    const searchInput = document.getElementById("home-search-input");
+    if (searchInput) {
+        searchInput.addEventListener("input", (event) => {
+            state.searchTerm = event.target.value || "";
+            renderArticleCards();
+            renderLinks();
+        });
+    }
+
+    document.addEventListener("keydown", (event) => {
+        const activeTag = document.activeElement?.tagName;
+        const isTypingContext = ["INPUT", "TEXTAREA", "SELECT"].includes(activeTag);
+
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+            event.preventDefault();
+            searchInput?.focus();
+            searchInput?.select();
+            return;
+        }
+
+        if (!isTypingContext && event.key === "/") {
+            event.preventDefault();
+            searchInput?.focus();
+        }
+    });
 
     // 登录按钮
     document.getElementById('login-btn')?.addEventListener('click', () => {
@@ -754,7 +1052,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // 管理按钮
     document.getElementById('manage-btn')?.addEventListener('click', async () => {
         // 加载站点设置到表单
-        const settings = await loadSettings();
+        const settings = await loadAdminSettings();
+        if (!settings) {
+            return;
+        }
+        await refreshArticleManagerData();
         const siteTitleInput = document.getElementById('site-title');
         const articleTitleInput = document.getElementById('footer-article-title');
         const icpInput = document.getElementById('footer-icp');
@@ -887,7 +1189,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 标签页切换
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            switchTab(btn.dataset.tab);
+            handleManageTabChange(btn.dataset.tab);
         });
     });
 
@@ -975,16 +1277,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('refresh-updates-btn')?.addEventListener('click', loadUpdates);
     document.getElementById('clear-updates-btn')?.addEventListener('click', clearUpdates);
 
-    // 标签页切换时加载记录
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            if (btn.dataset.tab === 'visit-log') {
-                loadVisits();
-            } else if (btn.dataset.tab === 'update-log') {
-                loadUpdates();
-            }
-        });
-    });
 });
 
 // 加载访问记录
@@ -999,7 +1291,7 @@ async function loadVisits() {
     } catch (error) {
         console.error('加载访问记录失败:', error);
         document.getElementById('visit-table-body').innerHTML =
-            '<tr><td colspan="3" style="padding: 20px; text-align: center; color: var(--danger-color);">加载失败</td></tr>';
+            '<tr class="log-error-row"><td colspan="3">加载失败</td></tr>';
     }
 }
 
@@ -1009,19 +1301,17 @@ function renderVisits(visits, total) {
     const tbody = document.getElementById('visit-table-body');
 
     if (!visits || visits.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" style="padding: 20px; text-align: center; color: var(--text-muted);">暂无访问记录</td></tr>';
+        tbody.innerHTML = '<tr class="log-empty-row"><td colspan="3">暂无访问记录</td></tr>';
         return;
     }
 
-    let html = '';
-    visits.forEach(visit => {
-        html += `<tr>
-            <td style="padding: 8px 10px; border-bottom: 1px solid var(--border-color);">${escapeHtml(visit.time)}</td>
-            <td style="padding: 8px 10px; border-bottom: 1px solid var(--border-color);">${escapeHtml(visit.ip)}</td>
-            <td style="padding: 8px 10px; border-bottom: 1px solid var(--border-color);">${escapeHtml(visit.path)}</td>
-        </tr>`;
-    });
-    tbody.innerHTML = html;
+    tbody.innerHTML = visits.map((visit) => `
+        <tr>
+            <td>${escapeHtml(visit.time)}</td>
+            <td>${escapeHtml(visit.ip)}</td>
+            <td>${escapeHtml(visit.path)}</td>
+        </tr>
+    `).join('');
 }
 
 // 清空访问记录
@@ -1052,7 +1342,7 @@ async function loadUpdates() {
     } catch (error) {
         console.error('加载更新记录失败:', error);
         document.getElementById('update-table-body').innerHTML =
-            '<tr><td colspan="5" style="padding: 20px; text-align: center; color: var(--danger-color);">加载失败</td></tr>';
+            '<tr class="log-error-row"><td colspan="5">加载失败</td></tr>';
     }
 }
 
@@ -1062,24 +1352,22 @@ function renderUpdates(updates, total) {
     const tbody = document.getElementById('update-table-body');
 
     if (!updates || updates.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: var(--text-muted);">暂无更新记录</td></tr>';
+        tbody.innerHTML = '<tr class="log-empty-row"><td colspan="5">暂无更新记录</td></tr>';
         return;
     }
 
     const actionMap = { add: '添加', update: '修改', delete: '删除', move: '移动' };
     const typeMap = { link: '链接', category: '分类', article: '文章', folder: '目录', settings: '设置' };
 
-    let html = '';
-    updates.forEach(update => {
-        html += `<tr>
-            <td style="padding: 8px 10px; border-bottom: 1px solid var(--border-color);">${escapeHtml(update.time)}</td>
-            <td style="padding: 8px 10px; border-bottom: 1px solid var(--border-color);">${escapeHtml(actionMap[update.action] || update.action)}</td>
-            <td style="padding: 8px 10px; border-bottom: 1px solid var(--border-color);">${escapeHtml(typeMap[update.target_type] || update.target_type)}</td>
-            <td style="padding: 8px 10px; border-bottom: 1px solid var(--border-color);">${escapeHtml(update.target_name)}</td>
-            <td style="padding: 8px 10px; border-bottom: 1px solid var(--border-color); font-size: 12px; color: var(--text-muted);">${escapeHtml(update.details || '')}</td>
-        </tr>`;
-    });
-    tbody.innerHTML = html;
+    tbody.innerHTML = updates.map((update) => `
+        <tr>
+            <td>${escapeHtml(update.time)}</td>
+            <td>${escapeHtml(actionMap[update.action] || update.action)}</td>
+            <td>${escapeHtml(typeMap[update.target_type] || update.target_type)}</td>
+            <td>${escapeHtml(update.target_name)}</td>
+            <td class="detail-cell">${escapeHtml(update.details || '')}</td>
+        </tr>
+    `).join('');
 }
 
 // 清空更新记录
@@ -1105,7 +1393,7 @@ async function importLinks(format) {
 
     if (!fileInput.files || fileInput.files.length === 0) {
         statusEl.textContent = '请先选择文件';
-        statusEl.style.color = 'var(--danger-color)';
+        setStatusTone(statusEl, 'error');
         return;
     }
 
@@ -1115,7 +1403,7 @@ async function importLinks(format) {
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
         statusEl.textContent = '文件过大，最大支持 10MB';
-        statusEl.style.color = 'var(--danger-color)';
+        setStatusTone(statusEl, 'error');
         showToast('文件过大，最大支持 10MB', 'error');
         return;
     }
@@ -1123,14 +1411,14 @@ async function importLinks(format) {
     // Security: Validate MIME type
     if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
         statusEl.textContent = '请选择有效的 JSON 文件';
-        statusEl.style.color = 'var(--danger-color)';
+        setStatusTone(statusEl, 'error');
         showToast('请选择有效的 JSON 文件', 'error');
         return;
     }
 
     try {
         statusEl.textContent = '正在导入...';
-        statusEl.style.color = 'var(--text-muted)';
+        setStatusTone(statusEl, 'muted');
 
         const text = await file.text();
         const data = JSON.parse(text);
@@ -1147,13 +1435,13 @@ async function importLinks(format) {
 
         const result = await response.json();
         statusEl.textContent = result.message;
-        statusEl.style.color = 'var(--success-color)';
+        setStatusTone(statusEl, 'success');
         loadLinks();
         fileInput.value = '';
         showToast('导入成功', 'success');
     } catch (error) {
         statusEl.textContent = '导入失败: ' + error.message;
-        statusEl.style.color = 'var(--danger-color)';
+        setStatusTone(statusEl, 'error');
         showToast('导入失败: ' + error.message, 'error');
     }
 }

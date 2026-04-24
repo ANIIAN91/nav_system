@@ -6,8 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.models import UpdateLog, VisitLog
 
-settings = get_settings()
-
 
 class LogService:
     """Service for managing logs."""
@@ -90,7 +88,7 @@ class LogService:
 
     async def cleanup_old_visits(self, max_records: int | None = None) -> int:
         """Keep only the newest visit logs."""
-        keep_count = max_records if max_records is not None else settings.max_visit_records
+        keep_count = max_records if max_records is not None else get_settings().max_visit_records
         count = await self._count_visits()
         if count <= keep_count:
             return 0
@@ -106,7 +104,7 @@ class LogService:
 
     async def cleanup_old_updates(self, max_records: int | None = None) -> int:
         """Keep only the newest update logs."""
-        keep_count = max_records if max_records is not None else settings.max_update_records
+        keep_count = max_records if max_records is not None else get_settings().max_update_records
         count = await self._count_updates()
         if count <= keep_count:
             return 0

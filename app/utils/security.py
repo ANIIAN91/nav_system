@@ -1,4 +1,4 @@
-﻿"""Security utilities."""
+"""Security utilities."""
 
 import ipaddress
 import socket
@@ -9,12 +9,10 @@ from urllib.parse import urlparse
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 
-settings = get_settings()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
@@ -30,6 +28,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a JWT access token with a JTI."""
+    settings = get_settings()
     to_encode = data.copy()
     issued_at = datetime.utcnow()
     expire = issued_at + (expires_delta or timedelta(minutes=15))
@@ -45,6 +44,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 def decode_access_token(token: str) -> Optional[dict]:
     """Decode a JWT access token payload using the configured app secrets."""
+    settings = get_settings()
     try:
         return jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
     except JWTError:
@@ -52,22 +52,10 @@ def decode_access_token(token: str) -> Optional[dict]:
 
 
 async def verify_token(token: str, db: AsyncSession) -> Optional[str]:
-    """Verify a JWT token and check blacklist state."""
-    payload = decode_access_token(token)
-    if payload is None:
-        return None
+    """Verify a JWT token through the shared token service boundary."""
+    from app.services.auth import TokenService
 
-    username: str = payload.get("sub")
-    jti: str = payload.get("jti")
-
-    if jti:
-        from app.models.token_blacklist import TokenBlacklist
-
-        result = await db.execute(select(TokenBlacklist).where(TokenBlacklist.jti == jti))
-        if result.scalar_one_or_none():
-            return None
-
-    return username
+    return await TokenService().verify_token(token, db)
 
 
 def is_safe_url(url: str) -> Tuple[bool, str]:

@@ -43,6 +43,29 @@ async def test_add_duplicate_category(client, auth_headers):
 
 
 @pytest.mark.asyncio
+async def test_category_name_rejects_path_separators(client, auth_headers):
+    """Category names should stay route-safe labels, not path-like values."""
+    create_response = await client.post(
+        "/api/v1/categories",
+        json={"name": "Dev/Tools", "auth_required": False},
+        headers=auth_headers,
+    )
+    assert create_response.status_code == 422
+
+    await client.post(
+        "/api/v1/categories",
+        json={"name": "Dev", "auth_required": False},
+        headers=auth_headers,
+    )
+    update_response = await client.put(
+        "/api/v1/categories/Dev",
+        json={"name": "Dev\\Tools", "auth_required": False},
+        headers=auth_headers,
+    )
+    assert update_response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_batch_reorder_categories(client, auth_headers):
     """Batch reorder should persist the provided category order."""
     for name in ("Alpha", "Beta", "Gamma"):

@@ -1,0 +1,29 @@
+<header class="header topbar">
+    <a href="/" class="brandmark" aria-label="nav system 首页">
+        <span class="brand-main" id="site-brand">ANIAN</span>
+        <span class="brand-sub">/ nav_system</span>
+    </a>
+
+    <nav class="topnav" aria-label="站点导航">
+        <button type="button" class="tnav active" data-home-view="navigation">导航</button>
+        <button type="button" class="tnav" data-home-view="articles"><span id="articles-view-label">文章</span></button>
+    </nav>
+
+    <div class="topright">
+        <label class="search-box" aria-label="搜索导航与文章">
+            <span class="ic">⌕</span>
+            <input type="search" id="home-search-input" placeholder="搜索文章或链接…" autocomplete="off">
+            <span class="search-hint">Ctrl/⌘K</span>
+        </label>
+
+        <div class="clock-badge">
+            <div class="clock" id="clock"></div>
+        </div>
+
+        <button id="theme-toggle" class="btn btn-secondary toolbar-btn" title="切换主题">&#9790;</button>
+        <span id="username-display" class="user-chip" hidden></span>
+        <button id="manage-btn" class="btn btn-secondary toolbar-btn" hidden>管理</button>
+        <button id="logout-btn" class="btn btn-secondary toolbar-btn" hidden>登出</button>
+        <button id="login-btn" class="btn btn-primary toolbar-btn" type="button">登录</button>
+    </div>
+</header>

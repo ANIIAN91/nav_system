@@ -3,9 +3,10 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.dependencies.auth import require_auth, security
 from app.database import get_db
 from app.schemas.auth import LoginRequest, TokenResponse
 from app.services.auth import (
@@ -16,33 +17,6 @@ from app.services.auth import (
 )
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
-security = HTTPBearer(auto_error=False)
-
-
-async def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    db: AsyncSession = Depends(get_db),
-    token_service: TokenService = Depends(get_token_service),
-) -> Optional[str]:
-    """Get current user with optional auth."""
-    if credentials is None:
-        return None
-    return await token_service.verify_token(credentials.credentials, db)
-
-
-async def require_auth(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    db: AsyncSession = Depends(get_db),
-    token_service: TokenService = Depends(get_token_service),
-) -> str:
-    """Require authentication."""
-    if credentials is None:
-        raise HTTPException(status_code=401, detail="未登录")
-    username = await token_service.verify_token(credentials.credentials, db)
-    if username is None:
-        raise HTTPException(status_code=401, detail="Token 无效或已过期")
-    return username
-
 
 @router.post("/login", response_model=TokenResponse)
 async def login(

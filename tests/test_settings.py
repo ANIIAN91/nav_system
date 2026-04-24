@@ -12,6 +12,14 @@ async def test_get_settings(client):
     assert "site_title" in data
     assert "link_size" in data
     assert "version" in data
+    assert "protected_article_paths" not in data
+
+
+@pytest.mark.asyncio
+async def test_get_admin_settings_requires_auth(client):
+    """Full settings should not be publicly readable."""
+    response = await client.get("/api/v1/settings/admin")
+    assert response.status_code == 401
 
 
 @pytest.mark.asyncio
@@ -56,7 +64,14 @@ async def test_update_settings_authenticated(client, auth_headers):
     get_data = get_response.json()
     assert get_data["site_title"] == "New Title"
     assert get_data["timezone"] == "Asia/Tokyo"
+    assert "protected_article_paths" not in get_data
     assert "analytics_code" not in get_data
+
+    admin_response = await client.get("/api/v1/settings/admin", headers=auth_headers)
+    assert admin_response.status_code == 200
+    admin_data = admin_response.json()
+    assert admin_data["protected_article_paths"] == ["private", "notes/secret"]
+    assert admin_data["timezone"] == "Asia/Tokyo"
 
 
 @pytest.mark.asyncio

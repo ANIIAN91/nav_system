@@ -814,7 +814,7 @@ async function fetchFaviconGeneric(url, iconInputId, statusElId) {
             statusEl.textContent = '图标获取成功: ' + data.icon;
             setStatusTone(statusEl, 'success');
         } else {
-            statusEl.textContent = '未找到图标';
+            statusEl.textContent = data.message || '未找到图标';
             setStatusTone(statusEl, 'error');
         }
     } catch (error) {

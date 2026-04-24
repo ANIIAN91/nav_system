@@ -2,7 +2,7 @@
 
 import httpx
 
-from app.utils.favicon import MAX_FAVICON_BYTES, _validated_icon_extension
+from app.utils.favicon import MAX_FAVICON_BYTES, _icon_urls_from_html, _validated_icon_extension
 
 
 def make_response(content_type: str, content: bytes, *, content_length: str | None = None) -> httpx.Response:
@@ -15,6 +15,16 @@ def make_response(content_type: str, content: bytes, *, content_length: str | No
 def test_favicon_validation_accepts_known_image_types():
     """Known raster favicon content types should map to safe extensions."""
     response = make_response("image/png; charset=binary", b"x" * 128)
+
+    extension, error = _validated_icon_extension(response)
+
+    assert extension == ".png"
+    assert error == ""
+
+
+def test_favicon_validation_accepts_sniffed_octet_stream_png():
+    """Some sites serve favicon bytes with a generic content type."""
+    response = make_response("application/octet-stream", b"\x89PNG\r\n\x1a\n" + b"x" * 64)
 
     extension, error = _validated_icon_extension(response)
 
@@ -60,3 +70,20 @@ def test_favicon_validation_rejects_oversized_content_length_header():
 
     assert extension is None
     assert "过大" in error
+
+
+def test_icon_urls_from_html_handles_multi_token_rel_and_relative_href():
+    """HTML parsing should support common rel token ordering and relative paths."""
+    html = """
+    <html><head>
+      <link href="/assets/favicon.png" rel="shortcut icon">
+      <link rel="apple-touch-icon" href="touch.png">
+    </head></html>
+    """
+
+    urls = _icon_urls_from_html("https://example.com/docs/page", html)
+
+    assert urls == [
+        "https://example.com/assets/favicon.png",
+        "https://example.com/docs/touch.png",
+    ]

@@ -13,11 +13,14 @@ from app.utils.cache import get_cached_settings, reset_cache_backend, set_cache_
 @pytest.mark.asyncio
 async def test_settings_service_returns_defaults(test_db):
     """Missing settings should be hydrated from defaults."""
-    data = await SettingsService(test_db).get_public_settings(use_cache=False)
+    service = SettingsService(test_db)
+    data = await service.get_settings(use_cache=False)
+    public_data = await service.get_public_settings(use_cache=False)
 
     assert data["site_title"] == "个人主页导航"
     assert data["protected_article_paths"] == []
     assert data["version"]
+    assert "protected_article_paths" not in public_data
     assert "analytics_code" not in data
 
 

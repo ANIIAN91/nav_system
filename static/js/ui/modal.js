@@ -16,6 +16,7 @@ export function openModal(target) {
     modal.classList.add("active");
     document.body.classList.add("modal-open");
     document.body.style.overflow = "hidden";
+    modal.dispatchEvent(new CustomEvent("modal:open"));
 }
 
 export function closeModal(target) {
@@ -24,6 +25,7 @@ export function closeModal(target) {
         return;
     }
     modal.classList.remove("active");
+    modal.dispatchEvent(new CustomEvent("modal:close"));
     if (!document.querySelector(".modal.active")) {
         document.body.classList.remove("modal-open");
         document.body.style.overflow = "";

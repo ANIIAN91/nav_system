@@ -42,16 +42,13 @@ def test_home_page_uses_module_entry_and_shared_endpoints():
     assert 'from "../core/endpoints.js"' in home_js
     assert "/api/v1/" not in home_js
     assert not Path("static/js/main.js").exists()
+    assert Path("static/js/pages/home/article-sheet.js").exists()
+    assert Path("static/js/pages/home/article-manager.js").exists()
 
-
-def test_article_page_uses_module_entry_and_shared_endpoints():
-    """Browser article page should use the module entry and shared endpoint builders."""
-    article_template = Path("templates/article.html").read_text(encoding="utf-8")
-    articles_js = Path("static/js/pages/articles.js").read_text(encoding="utf-8")
-
-    assert 'type="module" src="/static/js/pages/articles.js"' in article_template
-    assert 'from "../core/endpoints.js"' in articles_js
-    assert "/api/v1/" not in articles_js
+def test_legacy_article_page_bundle_removed():
+    """Legacy dedicated article page frontend should stay removed."""
+    assert not Path("templates/article.html").exists()
+    assert not Path("static/js/pages/articles.js").exists()
 
 
 def test_home_page_logout_uses_revoke_flow():

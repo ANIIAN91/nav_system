@@ -7,7 +7,7 @@ from app.config import GITHUB_URL, VERSION
 ALLOWED_LINK_SIZES = {"small", "medium", "large"}
 
 
-class SiteSettingsBase(BaseModel):
+class PublicSiteSettingsBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     icp: str = ""
@@ -15,7 +15,6 @@ class SiteSettingsBase(BaseModel):
     article_page_title: str = "文章"
     site_title: str = "个人主页导航"
     link_size: str = "medium"
-    protected_article_paths: list[str] = Field(default_factory=list)
     github_url: str = GITHUB_URL
     timezone: str = "Asia/Shanghai"
 
@@ -25,6 +24,10 @@ class SiteSettingsBase(BaseModel):
         if value not in ALLOWED_LINK_SIZES:
             raise ValueError("link_size 必须是 small、medium 或 large")
         return value
+
+
+class SiteSettingsBase(PublicSiteSettingsBase):
+    protected_article_paths: list[str] = Field(default_factory=list)
 
 
 class SiteSettingsUpdateRequest(BaseModel):
@@ -47,6 +50,10 @@ class SiteSettingsUpdateRequest(BaseModel):
         if value not in ALLOWED_LINK_SIZES:
             raise ValueError("link_size 必须是 small、medium 或 large")
         return value
+
+
+class PublicSiteSettingsResponse(PublicSiteSettingsBase):
+    version: str = VERSION
 
 
 class SiteSettingsResponse(SiteSettingsBase):

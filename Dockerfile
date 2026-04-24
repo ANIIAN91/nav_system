@@ -1,10 +1,13 @@
 FROM python:3.11-slim
 
+ARG APP_VERSION=2.0.0
 LABEL maintainer="your-email@example.com"
 LABEL description="个人主页导航系统 - 支持分类导航、文章展示、权限控制"
-LABEL version="2.0.0"
+LABEL version="${APP_VERSION}"
 
 WORKDIR /app
+
+ENV APP_VERSION=${APP_VERSION}
 
 # 安装系统依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -18,8 +21,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 复制应用代码
 COPY app/ app/
 COPY templates/ templates/
-COPY static/css/ static/css/
-COPY static/js/ static/js/
+COPY static/ static/
 COPY alembic/ alembic/
 COPY alembic.ini .
 COPY scripts/ scripts/

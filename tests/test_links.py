@@ -33,6 +33,18 @@ async def test_add_link_authenticated(client, auth_headers):
 
 
 @pytest.mark.asyncio
+async def test_add_link_rejects_path_like_category_name(client, auth_headers):
+    """Adding a link must not auto-create categories that cannot be addressed later."""
+    response = await client.post(
+        "/api/v1/links?category_name=Dev%2FTools",
+        json={"title": "Test Link", "url": "https://test.com"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
 async def test_batch_reorder_links(client, auth_headers):
     """Batch reorder should persist the provided link order within a category."""
     created_links = []

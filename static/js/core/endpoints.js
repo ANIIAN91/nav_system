@@ -28,6 +28,7 @@ export const endpoints = {
     },
     settings: {
         get: () => `${API_PREFIX}/settings`,
+        admin: () => `${API_PREFIX}/settings/admin`,
         update: () => `${API_PREFIX}/settings`,
     },
     links: {
@@ -46,6 +47,7 @@ export const endpoints = {
     },
     articles: {
         list: () => `${API_PREFIX}/articles`,
+        sync: () => `${API_PREFIX}/articles/sync`,
         detail: (path) => `${API_PREFIX}/articles/${encodePathSegments(path)}`,
         update: (path) => `${API_PREFIX}/articles/${encodePathSegments(path)}`,
         remove: (path) => `${API_PREFIX}/articles/${encodePathSegments(path)}`,

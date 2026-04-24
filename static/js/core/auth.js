@@ -35,6 +35,17 @@ export function storeSession(token, username) {
     }
 }
 
+function writeUsernameForCurrentToken(username) {
+    const normalizedUsername = normalizeStoredValue(username);
+    if (!normalizedUsername) {
+        return;
+    }
+
+    const tokenInSession = normalizeStoredValue(sessionStorage.getItem("token"));
+    const storage = tokenInSession ? sessionStorage : localStorage;
+    storage.setItem("username", normalizedUsername);
+}
+
 export function clearSession() {
     localStorage.removeItem("token");
     localStorage.removeItem("username");
@@ -75,4 +86,33 @@ export async function revokeSession(token = getToken()) {
             Authorization: `Bearer ${token}`,
         },
     });
+}
+
+export async function validateStoredSession(token = getToken()) {
+    if (!token) {
+        return null;
+    }
+
+    try {
+        const response = await fetch(endpoints.auth.me(), {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        if (!response.ok) {
+            clearSession();
+            return null;
+        }
+
+        const data = await response.json().catch(() => ({}));
+        writeUsernameForCurrentToken(data.username);
+        return {
+            token,
+            username: normalizeStoredValue(data.username) || getUsername(),
+        };
+    } catch {
+        clearSession();
+        return null;
+    }
 }

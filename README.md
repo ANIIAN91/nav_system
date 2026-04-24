@@ -258,15 +258,17 @@ static/js/
     toast.js
   pages/
     home.js
-    articles.js
+    home/
+      article-manager.js
+      article-sheet.js
 ```
 
 说明：
 
 - `core/endpoints.js` 是浏览器端接口路径唯一来源
 - `core/http.js` 负责通用请求、鉴权头和 401 回调
-- `pages/home.js`、`pages/articles.js` 只保留页面编排逻辑
-- 模板中不再保留文章页内联业务脚本，首页也已切到模块入口
+- `pages/home.js` 负责首页编排，文章浮页和文章管理已拆到 `pages/home/*`
+- 独立 `/articles` 页面已退场，旧链接会重定向回首页
 
 ## 后端结构
 

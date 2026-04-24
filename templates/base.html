@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ settings.site_title or "个人主页导航" }}{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block extra_styles %}{% endblock %}
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    {% block body %}{% endblock %}
+    {% block scripts %}{% endblock %}
+</body>
+</html>

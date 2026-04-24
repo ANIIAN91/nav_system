@@ -23,10 +23,40 @@ def test_folder_service_crud(isolated_articles_dir):
     assert not (isolated_articles_dir / "archive").exists()
 
 
+def test_folder_service_lists_nested_directories(isolated_articles_dir):
+    """Nested folders should be visible in the management list."""
+    service = FolderService()
+
+    service.create_folder("notes")
+    service.create_folder("notes/weekly")
+    (isolated_articles_dir / "notes" / "weekly" / "hello.md").write_text("# Hello", encoding="utf-8")
+
+    folders = service.list_folders()
+
+    assert folders == [
+        {"name": "notes", "path": "notes", "article_count": 1},
+        {"name": "notes/weekly", "path": "notes/weekly", "article_count": 1},
+    ]
+
+
 def test_folder_service_rejects_escape(isolated_articles_dir):
     """Folder traversal should be rejected."""
     with pytest.raises(ValueError):
         FolderService().create_folder("../secret")
+
+
+def test_folder_service_rejects_root_folder_operations(isolated_articles_dir):
+    """Root folder aliases should not operate on the whole article directory."""
+    service = FolderService()
+    (isolated_articles_dir / "hello.md").write_text("# Hello", encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        service.rename_folder(".", "archive")
+    with pytest.raises(ValueError):
+        service.delete_folder(".")
+
+    assert isolated_articles_dir.exists()
+    assert (isolated_articles_dir / "hello.md").exists()
 
 
 @pytest.mark.asyncio

@@ -1,0 +1,394 @@
+<!-- 登录弹窗 -->
+<div id="login-modal" class="modal" role="dialog" aria-labelledby="login-modal-title" aria-modal="true">
+    <div class="modal-content">
+        <button type="button" class="close" aria-label="关闭">&times;</button>
+        <h2 id="login-modal-title">登录</h2>
+        <form id="login-form">
+            <div class="form-group">
+                <label for="username">用户名</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">密码</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <div class="form-group checkbox-group">
+                <label>
+                    <input type="checkbox" id="remember-credentials" name="remember_credentials">
+                    记住用户名
+                </label>
+            </div>
+            <button type="submit" class="btn btn-primary">登录</button>
+            <p id="login-error" class="error"></p>
+        </form>
+    </div>
+</div>
+
+<!-- 管理弹窗 -->
+<div id="manage-modal" class="modal" role="dialog" aria-labelledby="manage-modal-title" aria-modal="true">
+    <div class="modal-content modal-large">
+        <button type="button" class="close" aria-label="关闭">&times;</button>
+        <h2 id="manage-modal-title">管理</h2>
+        <div class="manage-layout">
+            <div class="manage-tabs">
+                <button class="tab-btn active" data-tab="add-link">添加链接</button>
+                <button class="tab-btn" data-tab="add-category">添加分类</button>
+                <button class="tab-btn" data-tab="article-library">文章管理</button>
+                <button class="tab-btn" data-tab="folder-library">目录管理</button>
+                <button class="tab-btn" data-tab="site-settings">站点设置</button>
+                <button class="tab-btn" data-tab="import-export">导入导出</button>
+                <button class="tab-btn" data-tab="visit-log">访问记录</button>
+                <button class="tab-btn" data-tab="update-log">更新记录</button>
+            </div>
+            <div class="manage-content">
+                <div id="add-link" class="tab-content active">
+                    <form id="add-link-form">
+                        <div class="form-group">
+                            <label for="link-category">分类</label>
+                            <select id="link-category" name="category" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="link-title">标题</label>
+                            <input type="text" id="link-title" name="title" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="link-url">URL</label>
+                            <input type="url" id="link-url" name="url" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="link-icon">图标文件名（可选）</label>
+                            <input type="text" id="link-icon" name="icon" placeholder="例如: icon.png">
+                            <button type="button" id="fetch-icon-btn" class="btn btn-secondary input-action-btn">自动获取图标</button>
+                            <small id="fetch-icon-status" class="form-help"></small>
+                        </div>
+                        <button type="submit" class="btn btn-primary">添加</button>
+                    </form>
+                </div>
+                <div id="add-category" class="tab-content">
+                    <form id="add-category-form">
+                        <div class="form-group">
+                            <label for="category-name">分类名称</label>
+                            <input type="text" id="category-name" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="category-auth" name="auth_required">
+                                需要登录才可见
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary">添加</button>
+                    </form>
+                </div>
+                <div id="article-library" class="tab-content">
+                    <div class="manage-section-head">
+                        <div>
+                            <div class="manage-section-title">文章管理</div>
+                            <p class="manage-section-copy">统一查看、打开、创建、编辑和删除文章。</p>
+                        </div>
+                        <div class="manage-section-actions">
+                            <button type="button" id="new-article-btn" class="btn btn-primary">新建文章</button>
+                            <button type="button" id="refresh-articles-btn" class="btn btn-secondary">刷新</button>
+                        </div>
+                    </div>
+                    <div id="manage-article-list" class="manage-resource-list">
+                        <div class="manage-resource-empty">正在加载文章...</div>
+                    </div>
+                </div>
+                <div id="folder-library" class="tab-content">
+                    <div class="manage-section-head">
+                        <div>
+                            <div class="manage-section-title">目录管理</div>
+                            <p class="manage-section-copy">创建目录，或对现有目录进行重命名和删除。</p>
+                        </div>
+                        <button type="button" id="refresh-folders-btn" class="btn btn-secondary">刷新</button>
+                    </div>
+                    <form id="create-folder-form" class="manage-inline-form">
+                        <input type="text" id="new-folder-name" placeholder="输入目录名称，例如 notes/weekly">
+                        <button type="submit" id="create-folder-btn" class="btn btn-primary">创建目录</button>
+                    </form>
+                    <div id="manage-folder-list" class="manage-resource-list">
+                        <div class="manage-resource-empty">正在加载目录...</div>
+                    </div>
+                </div>
+                <div id="site-settings" class="tab-content">
+                    <form id="edit-footer-form">
+                        <div class="form-group">
+                            <label for="site-title">网站标题</label>
+                            <input type="text" id="site-title" name="site_title" placeholder="例如: 个人主页导航">
+                        </div>
+                        <div class="form-group">
+                            <label for="footer-article-title">文章模块标题</label>
+                            <input type="text" id="footer-article-title" name="article_page_title" placeholder="例如: 文章、博客、笔记">
+                        </div>
+                        <div class="form-group">
+                            <label for="link-size">链接大小</label>
+                            <select id="link-size" name="link_size">
+                                <option value="small">小</option>
+                                <option value="medium">中</option>
+                                <option value="large">大</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="timezone">时区设置</label>
+                            <select id="timezone" name="timezone">
+                                <option value="Asia/Shanghai">中国 - 北京时间 (UTC+8)</option>
+                                <option value="Asia/Tokyo">日本 - 东京 (UTC+9)</option>
+                                <option value="Asia/Seoul">韩国 - 首尔 (UTC+9)</option>
+                                <option value="Asia/Hong_Kong">中国 - 香港 (UTC+8)</option>
+                                <option value="Asia/Taipei">中国 - 台北 (UTC+8)</option>
+                                <option value="Asia/Singapore">新加坡 (UTC+8)</option>
+                                <option value="Asia/Bangkok">泰国 - 曼谷 (UTC+7)</option>
+                                <option value="Asia/Dubai">阿联酋 - 迪拜 (UTC+4)</option>
+                                <option value="Europe/London">英国 - 伦敦 (UTC+0)</option>
+                                <option value="Europe/Paris">法国 - 巴黎 (UTC+1)</option>
+                                <option value="Europe/Berlin">德国 - 柏林 (UTC+1)</option>
+                                <option value="Europe/Moscow">俄罗斯 - 莫斯科 (UTC+3)</option>
+                                <option value="America/New_York">美国 - 纽约 (UTC-5)</option>
+                                <option value="America/Chicago">美国 - 芝加哥 (UTC-6)</option>
+                                <option value="America/Denver">美国 - 丹佛 (UTC-7)</option>
+                                <option value="America/Los_Angeles">美国 - 洛杉矶 (UTC-8)</option>
+                                <option value="America/Toronto">加拿大 - 多伦多 (UTC-5)</option>
+                                <option value="America/Vancouver">加拿大 - 温哥华 (UTC-8)</option>
+                                <option value="Australia/Sydney">澳大利亚 - 悉尼 (UTC+10)</option>
+                                <option value="Australia/Melbourne">澳大利亚 - 墨尔本 (UTC+10)</option>
+                                <option value="Pacific/Auckland">新西兰 - 奥克兰 (UTC+12)</option>
+                            </select>
+                            <small class="form-help">设置页面顶部时钟显示的时区</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="protected-paths">受保护的文章目录（需登录查看）</label>
+                            <input type="text" id="protected-paths" name="protected_article_paths" placeholder="多个目录用逗号分隔，如: private,notes/secret">
+                            <small class="form-help">输入目录名，该目录下的文章需要登录后才能查看</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="footer-icp">备案号</label>
+                            <input type="text" id="footer-icp" name="icp" placeholder="例如: 京ICP备XXXXXXXX号">
+                        </div>
+                        <div class="form-group">
+                            <label for="footer-copyright">版权信息</label>
+                            <input type="text" id="footer-copyright" name="copyright" placeholder="例如: © 2024 Your Name">
+                        </div>
+                        <div class="form-group">
+                            <label for="github-url">GitHub 仓库地址</label>
+                            <input type="text" id="github-url" name="github_url" placeholder="例如: https://github.com/ANIIAN91/nav_system">
+                            <small class="form-help">页脚显示的 GitHub 仓库链接</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary">保存</button>
+                    </form>
+                </div>
+                <div id="import-export" class="tab-content">
+                    <div class="form-group">
+                        <label>导出</label>
+                        <button type="button" id="export-links-btn" class="btn btn-secondary">导出导航数据</button>
+                    </div>
+                    <hr class="subtle-divider">
+                    <div class="form-group">
+                        <label>导入</label>
+                        <input type="file" id="import-file" accept=".json" class="input-file">
+                        <div class="inline-actions">
+                            <button type="button" id="import-native-btn" class="btn btn-secondary">导入(原生格式)</button>
+                            <button type="button" id="import-sunpanel-btn" class="btn btn-secondary">导入(SunPanel)</button>
+                        </div>
+                        <small id="import-status" class="form-help"></small>
+                    </div>
+                    <hr class="subtle-divider">
+                    <div class="form-group">
+                        <label>API Token（用于 Obsidian 插件或脚本同步）</label>
+                        <div class="token-row">
+                            <input type="text" id="jwt-token-display" class="token-display" readonly>
+                            <button type="button" id="toggle-token-btn" class="btn btn-secondary">显示 Token</button>
+                            <button type="button" id="copy-token-btn" class="btn btn-secondary">复制</button>
+                        </div>
+                        <small class="form-help">此 Token 用于 Obsidian 插件或 Python 脚本同步文章</small>
+                    </div>
+                </div>
+                <div id="visit-log" class="tab-content">
+                    <div class="form-group">
+                        <div class="table-toolbar">
+                            <label class="table-toolbar-label">访问记录 (<span id="visit-total">0</span> 条)</label>
+                            <div class="inline-actions">
+                                <button type="button" id="refresh-visits-btn" class="btn btn-secondary">刷新</button>
+                                <button type="button" id="clear-visits-btn" class="btn btn-danger">清空</button>
+                            </div>
+                        </div>
+                        <div id="visit-list" class="data-log-shell">
+                            <table class="data-log-table">
+                                <thead>
+                                    <tr>
+                                        <th>时间</th>
+                                        <th>IP</th>
+                                        <th>路径</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="visit-table-body">
+                                    <tr class="log-empty-row"><td colspan="3">加载中...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div id="update-log" class="tab-content">
+                    <div class="form-group">
+                        <div class="table-toolbar">
+                            <label class="table-toolbar-label">更新记录 (<span id="update-total">0</span> 条)</label>
+                            <div class="inline-actions">
+                                <button type="button" id="refresh-updates-btn" class="btn btn-secondary">刷新</button>
+                                <button type="button" id="clear-updates-btn" class="btn btn-danger">清空</button>
+                            </div>
+                        </div>
+                        <div id="update-list" class="data-log-shell">
+                            <table class="data-log-table">
+                                <thead>
+                                    <tr>
+                                        <th>时间</th>
+                                        <th>操作</th>
+                                        <th>类型</th>
+                                        <th>目标</th>
+                                        <th>详情</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="update-table-body">
+                                    <tr class="log-empty-row"><td colspan="5">加载中...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑链接弹窗 -->
+<div id="edit-modal" class="modal" role="dialog" aria-labelledby="edit-modal-title" aria-modal="true">
+    <div class="modal-content">
+        <button type="button" class="close" aria-label="关闭">&times;</button>
+        <h2 id="edit-modal-title">编辑链接</h2>
+        <form id="edit-link-form">
+            <input type="hidden" id="edit-link-id">
+            <div class="form-group">
+                <label for="edit-link-category">所属分类</label>
+                <select id="edit-link-category" name="category" required></select>
+            </div>
+            <div class="form-group">
+                <label for="edit-link-title">标题</label>
+                <input type="text" id="edit-link-title" name="title" required>
+            </div>
+            <div class="form-group">
+                <label for="edit-link-url">URL</label>
+                <input type="url" id="edit-link-url" name="url" required>
+            </div>
+            <div class="form-group">
+                <label for="edit-link-icon">图标文件名</label>
+                <input type="text" id="edit-link-icon" name="icon">
+                <button type="button" id="edit-fetch-icon-btn" class="btn btn-secondary input-action-btn">自动获取图标</button>
+                <small id="edit-fetch-icon-status" class="form-help"></small>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">保存</button>
+                <button type="button" id="delete-link-btn" class="btn btn-danger">删除</button>
+            </div>
+            <div class="form-group grouped-form-group">
+                <label>调整顺序</label>
+                <div class="inline-actions">
+                    <button type="button" id="link-move-up-btn" class="btn btn-secondary">上移</button>
+                    <button type="button" id="link-move-down-btn" class="btn btn-secondary">下移</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 编辑分类弹窗 -->
+<div id="edit-category-modal" class="modal" role="dialog" aria-labelledby="edit-category-modal-title" aria-modal="true">
+    <div class="modal-content">
+        <button type="button" class="close" aria-label="关闭">&times;</button>
+        <h2 id="edit-category-modal-title">编辑分类</h2>
+        <form id="edit-category-form">
+            <input type="hidden" id="edit-category-old-name">
+            <div class="form-group">
+                <label for="edit-category-name">分类名称</label>
+                <input type="text" id="edit-category-name" name="name" required>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="edit-category-auth" name="auth_required">
+                    需要登录才可见
+                </label>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">保存</button>
+                <button type="button" id="delete-category-modal-btn" class="btn btn-danger">删除分类</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 编辑文章弹窗 -->
+<div id="edit-article-modal" class="modal" role="dialog" aria-labelledby="edit-article-modal-title" aria-modal="true">
+    <div class="modal-content article-editor-modal">
+        <button type="button" class="close" aria-label="关闭">&times;</button>
+        <h2 id="edit-article-modal-title">编辑文章</h2>
+        <form id="edit-article-form">
+            <input type="hidden" id="edit-article-original-path">
+            <div class="form-group">
+                <label for="edit-article-path">文章路径</label>
+                <input type="text" id="edit-article-path" name="path" placeholder="例如: notes/weekly/hello.md" required>
+                <small id="edit-article-path-help" class="form-help">支持 `notes/weekly/hello` 或 `notes/weekly/hello.md`。</small>
+            </div>
+            <div class="form-group">
+                <label for="edit-article-content">内容 (Markdown)</label>
+                <textarea id="edit-article-content" name="content" rows="18"></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="submit" id="save-article-btn" class="btn btn-primary">保存</button>
+                <button type="button" id="delete-article-btn" class="btn btn-danger">删除文章</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 编辑目录弹窗 -->
+<div id="edit-folder-modal" class="modal" role="dialog" aria-labelledby="edit-folder-modal-title" aria-modal="true">
+    <div class="modal-content">
+        <button type="button" class="close" aria-label="关闭">&times;</button>
+        <h2 id="edit-folder-modal-title">编辑目录</h2>
+        <form id="edit-folder-form">
+            <input type="hidden" id="edit-folder-old-name">
+            <div class="form-group">
+                <label for="edit-folder-name">目录名称</label>
+                <input type="text" id="edit-folder-name" name="name" required>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">保存</button>
+                <button type="button" id="delete-folder-btn" class="btn btn-danger">删除目录</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 文章浮页 -->
+<div id="article-sheet-modal" class="modal article-sheet-modal" role="dialog" aria-labelledby="article-sheet-title" aria-modal="true">
+    <div class="modal-content article-sheet-panel">
+        <button type="button" class="close" aria-label="关闭">&times;</button>
+        <div class="article-sheet-header">
+            <div class="article-sheet-headline">
+                <div class="article-sheet-kicker" id="article-sheet-category">Article</div>
+                <h2 id="article-sheet-title">文章</h2>
+                <div class="article-sheet-meta">
+                    <span id="article-sheet-date">--</span>
+                    <span id="article-sheet-visibility">公开</span>
+                </div>
+            </div>
+            <div class="article-sheet-controls">
+                <button type="button" id="article-sheet-top" class="btn btn-secondary sheet-ghost-btn">TOP</button>
+                <button type="button" id="article-sheet-down" class="btn btn-secondary sheet-ghost-btn">DOWN</button>
+            </div>
+        </div>
+        <div id="article-sheet-body" class="article-sheet-body">
+            <div id="article-sheet-content" class="article-sheet-content">
+                <p class="placeholder">选择文章后会在这里展开。</p>
+            </div>
+        </div>
+    </div>
+</div>

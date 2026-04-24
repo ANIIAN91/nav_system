@@ -1,5 +1,7 @@
 """Authentication tests."""
 
+from datetime import timedelta
+
 import pytest
 
 from app.config import get_settings
@@ -62,6 +64,51 @@ async def test_logout_invalid_token_returns_401(client):
     """Invalid tokens should not report a successful server-side logout."""
     response = await client.post("/api/v1/auth/logout", headers={"Authorization": "Bearer invalid"})
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_require_auth_distinguishes_missing_and_invalid_token(client):
+    """Required auth should keep explicit 401 reasons for missing and invalid tokens."""
+    missing_response = await client.get("/api/v1/auth/me")
+    invalid_response = await client.get("/api/v1/auth/me", headers={"Authorization": "Bearer invalid"})
+
+    assert missing_response.status_code == 401
+    assert missing_response.json()["detail"] == "未登录"
+    assert invalid_response.status_code == 401
+    assert invalid_response.json()["detail"] == "Token 无效或已过期"
+
+
+@pytest.mark.asyncio
+async def test_public_optional_auth_endpoints_reject_invalid_token(client):
+    """Public GET endpoints should reject an invalid supplied token instead of downgrading to anonymous."""
+    headers = {"Authorization": "Bearer invalid"}
+
+    for path in ("/api/v1/links", "/api/v1/articles", "/api/v1/articles/notes/hello.md"):
+        response = await client.get(path, headers=headers)
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Token 无效或已过期"
+
+
+@pytest.mark.asyncio
+async def test_public_optional_auth_endpoint_rejects_expired_token(client):
+    """Public GET endpoints should reject an expired supplied token."""
+    token = create_access_token(data={"sub": "testuser"}, expires_delta=timedelta(seconds=-1))
+
+    response = await client.get("/api/v1/links", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Token 无效或已过期"
+
+
+@pytest.mark.asyncio
+async def test_public_optional_auth_endpoint_rejects_revoked_token(client, auth_headers):
+    """Public GET endpoints should reject a revoked supplied token."""
+    logout_response = await client.post("/api/v1/auth/logout", headers=auth_headers)
+    response = await client.get("/api/v1/links", headers=auth_headers)
+
+    assert logout_response.status_code == 200
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Token 无效或已过期"
 
 
 @pytest.mark.asyncio

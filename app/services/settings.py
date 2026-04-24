@@ -21,6 +21,19 @@ DEFAULT_SETTINGS = {
     "github_url": GITHUB_URL,
     "timezone": "Asia/Shanghai",
 }
+
+PUBLIC_SETTING_KEYS = (
+    "icp",
+    "copyright",
+    "article_page_title",
+    "site_title",
+    "link_size",
+    "github_url",
+    "timezone",
+    "version",
+)
+
+
 class SettingsService:
     """Settings read and write boundary."""
 
@@ -47,7 +60,8 @@ class SettingsService:
 
     async def get_public_settings(self, use_cache: bool = True) -> dict:
         """Return public site settings."""
-        return await self.get_settings(use_cache=use_cache)
+        settings = await self.get_settings(use_cache=use_cache)
+        return {key: settings[key] for key in PUBLIC_SETTING_KEYS}
 
     async def update_settings(self, payload: SiteSettingsUpdateRequest) -> dict:
         """Persist settings into the typed row."""

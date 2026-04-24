@@ -9,6 +9,13 @@ from app.config import get_settings
 from app.core import normalize_article_path, safe_path_under_root
 
 
+def _normalize_folder_name(name: str, message: str = "目录名称无效") -> str:
+    normalized_name = normalize_article_path(name)
+    if not normalized_name:
+        raise ValueError(message)
+    return normalized_name
+
+
 class FolderService:
     """File-backed folder operations."""
 
@@ -16,18 +23,22 @@ class FolderService:
         self.articles_dir = articles_dir or get_settings().articles_dir
 
     def list_folders(self) -> list[dict]:
-        """List top-level folders under the article root."""
+        """List folders under the article root, including nested directories."""
         folders: list[dict] = []
         if not self.articles_dir.exists():
             return folders
 
-        for item in sorted(self.articles_dir.iterdir(), key=lambda entry: entry.name.lower()):
-            if not item.is_dir():
+        for item in sorted(
+            (path for path in self.articles_dir.rglob("*") if path.is_dir()),
+            key=lambda entry: entry.relative_to(self.articles_dir).as_posix().lower(),
+        ):
+            relative_path = item.relative_to(self.articles_dir).as_posix()
+            if not relative_path or relative_path == ".":
                 continue
             folders.append(
                 {
-                    "name": item.name,
-                    "path": item.name,
+                    "name": relative_path,
+                    "path": relative_path,
                     "article_count": len(list(item.rglob("*.md"))),
                 }
             )
@@ -39,9 +50,7 @@ class FolderService:
 
     def create_folder(self, name: str) -> dict:
         """Create a folder relative to the article root."""
-        normalized_name = normalize_article_path(name)
-        if not normalized_name:
-            raise ValueError("目录名称无效")
+        normalized_name = _normalize_folder_name(name)
 
         folder_path = safe_path_under_root(self.articles_dir, normalized_name)
         if folder_path.exists():
@@ -56,10 +65,8 @@ class FolderService:
 
     def rename_folder(self, name: str, new_name: str) -> dict:
         """Rename an existing folder."""
-        normalized_name = normalize_article_path(name)
-        normalized_new_name = normalize_article_path(new_name)
-        if not normalized_new_name:
-            raise ValueError("新目录名称无效")
+        normalized_name = _normalize_folder_name(name)
+        normalized_new_name = _normalize_folder_name(new_name, "新目录名称无效")
 
         folder_path = safe_path_under_root(self.articles_dir, normalized_name)
         if not folder_path.exists() or not folder_path.is_dir():
@@ -78,7 +85,7 @@ class FolderService:
 
     def delete_folder(self, name: str) -> dict:
         """Delete a folder and count contained articles."""
-        normalized_name = normalize_article_path(name)
+        normalized_name = _normalize_folder_name(name)
         folder_path = safe_path_under_root(self.articles_dir, normalized_name)
         if not folder_path.exists() or not folder_path.is_dir():
             raise FileNotFoundError("目录不存在")

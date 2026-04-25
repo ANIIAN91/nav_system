@@ -1,4 +1,5 @@
 import {
+    apiFetch,
     clearRememberedUsername,
     clearSession,
     cleanupLegacyCredentialStorage,
@@ -7,22 +8,32 @@ import {
     loadSavedUsername,
     revokeSession,
     setRememberedUsername,
+    setUnauthorizedHandler,
     storeSession,
     validateStoredSession,
-} from "../core/auth.js";
+} from "../core/auth.js?v=20260425b";
 import { endpoints } from "../core/endpoints.js";
-import { apiFetch, setUnauthorizedHandler } from "../core/request.js";
-import { homePageState as state } from "../core/app-state.js";
 import {
     initArticleManager,
     loadManageArticles,
     loadManageFolders,
     refreshArticleManagerData,
-} from "./home/article-manager.js";
-import { initArticleSheet, maybeOpenArticleFromLocation, openArticleSheet } from "./home/article-sheet.js";
+} from "./home/article-manager.js?v=20260425b";
+import { initArticleSheet, maybeOpenArticleFromLocation, openArticleSheet } from "./home/article-sheet.js?v=20260425b";
 import { closeModal, initModalSystem, openModal } from "../ui/modal.js";
 import { initTheme, toggleTheme } from "../ui/theme.js";
 import { showToast } from "../ui/toast.js";
+
+const state = {
+    token: getToken(),
+    username: getUsername(),
+    links: { categories: [] },
+    articles: [],
+    settings: { link_size: "medium", protected_article_paths: [] },
+    currentCategory: null,
+    currentView: "navigation",
+    searchTerm: "",
+};
 
 // URL protocol validation to prevent XSS via javascript: protocol
 function isSafeUrl(url) {

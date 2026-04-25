@@ -291,7 +291,7 @@ nav_system/
 
 ```text
 static/js/
-├── core/                    # auth、request、endpoints、app-state
+├── core/                    # auth、endpoints
 ├── ui/                      # modal、theme、toast
 └── pages/
     ├── home.js

@@ -35,15 +35,17 @@ def test_obsidian_plugin_uses_shared_api_module():
 def test_home_page_uses_module_entry_and_shared_endpoints():
     """Browser home page should use the module entry and shared endpoint builders."""
     index_template = Path("templates/index.html").read_text(encoding="utf-8")
-    home_js = Path("static/js/pages/home.js").read_text(encoding="utf-8")
+    home_js = Path("static/js/pages/home-20260425c.js").read_text(encoding="utf-8")
 
     assert 'type="module" src="/static/js/pages/home-20260425c.js"' in index_template
     assert "/static/js/main.js" not in index_template
     assert 'from "../core/endpoints.js"' in home_js
     assert "/api/v1/" not in home_js
     assert not Path("static/js/main.js").exists()
-    assert Path("static/js/pages/home/article-sheet.js").exists()
-    assert Path("static/js/pages/home/article-manager.js").exists()
+    assert Path("static/js/pages/home/article-sheet-20260425c.js").exists()
+    assert Path("static/js/pages/home/article-manager-20260425c.js").exists()
+    assert not Path("static/js/pages/home.js").exists()
+    assert not Path("static/js/core/auth.js").exists()
 
 def test_legacy_article_page_bundle_removed():
     """Legacy dedicated article page frontend should stay removed."""
@@ -53,8 +55,8 @@ def test_legacy_article_page_bundle_removed():
 
 def test_home_page_logout_uses_revoke_flow():
     """Browser logout should continue to call the shared revoke flow."""
-    home_js = Path("static/js/pages/home.js").read_text(encoding="utf-8")
-    auth_js = Path("static/js/core/auth.js").read_text(encoding="utf-8")
+    home_js = Path("static/js/pages/home-20260425c.js").read_text(encoding="utf-8")
+    auth_js = Path("static/js/core/auth-session-20260425c.js").read_text(encoding="utf-8")
 
     assert 'revokeSession' in home_js
     assert 'await revokeSession(token);' in home_js

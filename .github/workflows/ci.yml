@@ -34,7 +34,9 @@ jobs:
 
       - name: Check endpoint contract hygiene
         run: |
-          ! rg '/api/v1/' scripts/sync_articles.py obsidian-plugin/main.js static/js/pages/home.js
+          ! rg '/api/v1/' scripts/sync_articles.py obsidian-plugin/main.js static/js/pages/home-20260425c.js
+          test ! -e static/js/pages/home.js
+          test ! -e static/js/core/auth.js
           test ! -e static/js/pages/articles.js
           test ! -e templates/article.html
           ! rg '/static/js/main.js' templates/index.html

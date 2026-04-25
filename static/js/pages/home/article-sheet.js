@@ -1,5 +1,5 @@
 import { endpoints } from "../../core/endpoints.js";
-import { apiFetch, parseJson } from "../../core/http.js";
+import { apiFetch, parseJson } from "../../core/request.js";
 import { openModal } from "../../ui/modal.js";
 
 let currentArticlePath = null;

@@ -93,7 +93,7 @@ ADMIN_PASSWORD=change_this_password
 | `ADMIN_USERNAME` | 无 | 管理员用户名 |
 | `ADMIN_PASSWORD` | 无 | 管理员明文密码 |
 | `ADMIN_PASSWORD_HASH` | 无 | 管理员密码哈希，优先用于生产部署 |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | 登录 token 有效期 |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `43200` | 登录 token 有效期，默认 30 天 |
 | `MAX_LOGIN_ATTEMPTS` | `5` | 登录窗口内最大失败次数 |
 | `LOGIN_WINDOW_SECONDS` | `300` | 登录限流统计窗口 |
 | `LOCKOUT_SECONDS` | `900` | 登录锁定时间 |
@@ -291,7 +291,7 @@ nav_system/
 
 ```text
 static/js/
-├── core/                    # auth、http、endpoints、state
+├── core/                    # auth、request、endpoints、app-state
 ├── ui/                      # modal、theme、toast
 └── pages/
     ├── home.js
@@ -323,6 +323,7 @@ pytest
 - 不要提交真实 `.env`、数据库、个人文章、备份文件或图标缓存
 - 默认 `.gitignore` 已排除 `.env`、`data/`、`articles/`、`static/icons/` 和常见密钥文件
 - 前端只提供“记住用户名”，不保存密码
+- 登录保持依赖本地 token，有效期由 `ACCESS_TOKEN_EXPIRE_MINUTES` 控制，默认 30 天
 
 ## 维护建议
 

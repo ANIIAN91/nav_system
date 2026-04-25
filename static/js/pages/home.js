@@ -11,8 +11,8 @@ import {
     validateStoredSession,
 } from "../core/auth.js";
 import { endpoints } from "../core/endpoints.js";
-import { apiFetch, setUnauthorizedHandler } from "../core/http.js";
-import { homePageState as state } from "../core/state.js";
+import { apiFetch, setUnauthorizedHandler } from "../core/request.js";
+import { homePageState as state } from "../core/app-state.js";
 import {
     initArticleManager,
     loadManageArticles,

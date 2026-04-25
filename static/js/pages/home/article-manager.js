@@ -1,5 +1,5 @@
 import { endpoints } from "../../core/endpoints.js";
-import { apiFetch, parseJson } from "../../core/http.js";
+import { apiFetch, parseJson } from "../../core/request.js";
 import { closeModal, openModal } from "../../ui/modal.js";
 import { showToast } from "../../ui/toast.js";
 

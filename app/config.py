@@ -55,7 +55,7 @@ class Settings:
             admin_password=os.getenv("ADMIN_PASSWORD", ""),
             admin_password_hash=os.getenv("ADMIN_PASSWORD_HASH", ""),
             algorithm=os.getenv("JWT_ALGORITHM", "HS256"),
-            access_token_expire_minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")),
+            access_token_expire_minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "43200")),
             max_login_attempts=int(os.getenv("MAX_LOGIN_ATTEMPTS", "5")),
             login_window_seconds=int(os.getenv("LOGIN_WINDOW_SECONDS", "300")),
             lockout_seconds=int(os.getenv("LOCKOUT_SECONDS", "900")),

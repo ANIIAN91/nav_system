@@ -37,7 +37,7 @@ def test_home_page_uses_module_entry_and_shared_endpoints():
     index_template = Path("templates/index.html").read_text(encoding="utf-8")
     home_js = Path("static/js/pages/home.js").read_text(encoding="utf-8")
 
-    assert 'type="module" src="/static/js/pages/home.js' in index_template
+    assert 'type="module" src="/static/js/pages/home-20260425c.js"' in index_template
     assert "/static/js/main.js" not in index_template
     assert 'from "../core/endpoints.js"' in home_js
     assert "/api/v1/" not in home_js

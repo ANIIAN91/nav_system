@@ -294,7 +294,8 @@ static/js/
 ├── core/                    # auth、endpoints
 ├── ui/                      # modal、theme、toast
 └── pages/
-    ├── home.js
+    ├── home.js                 # 开发入口
+    ├── home-20260425c.js       # 生产缓存规避入口
     └── home/                # 文章浮页和文章管理模块
 ```
 

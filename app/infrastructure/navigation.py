@@ -69,6 +69,10 @@ class SqlAlchemyNavigationRepository:
         result = await self.db.execute(select(Link.id).where(Link.category_id == category_id))
         return list(result.scalars().all())
 
+    async def list_link_urls_in_category(self, category_id: int) -> list[str]:
+        result = await self.db.execute(select(Link.url).where(Link.category_id == category_id))
+        return list(result.scalars().all())
+
     async def list_links_by_category(self, category_id: int) -> list[Link]:
         result = await self.db.execute(
             select(Link).where(Link.category_id == category_id).order_by(Link.sort_order)

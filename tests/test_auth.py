@@ -198,3 +198,87 @@ class TestAuthService:
     def test_validate_config_returns_list(self):
         errors = AuthService().validate_config()
         assert isinstance(errors, list)
+
+
+@pytest.mark.asyncio
+async def test_login_sets_httponly_session_cookie(client):
+    """Browser login should rely on an HttpOnly cookie, usable for /me."""
+    response = await client.post("/api/v1/auth/login", json={"username": "admin", "password": "admin123"})
+    assert response.status_code == 200
+    set_cookie = response.headers["set-cookie"]
+    assert "nav_session=" in set_cookie
+    assert "HttpOnly" in set_cookie
+    assert "samesite=lax" in set_cookie.lower()
+    # 未勾选“保持登录”时为会话 Cookie
+    assert "Max-Age" not in set_cookie
+
+    me_response = await client.get("/api/v1/auth/me")
+    assert me_response.status_code == 200
+    assert me_response.json()["username"] == "admin"
+
+
+@pytest.mark.asyncio
+async def test_login_remember_sets_persistent_cookie(client):
+    """Remember-me login should persist the session cookie for the token lifetime."""
+    response = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin123", "remember": True},
+    )
+    assert response.status_code == 200
+    expected_seconds = get_settings().access_token_expire_minutes * 60
+    assert f"Max-Age={expected_seconds}" in response.headers["set-cookie"]
+
+
+@pytest.mark.asyncio
+async def test_cookie_write_requests_require_csrf_header(client):
+    """Cookie-authenticated writes must carry the custom request header."""
+    await client.post("/api/v1/auth/login", json={"username": "admin", "password": "admin123"})
+
+    rejected = await client.post("/api/v1/categories", json={"name": "Cookie Category"})
+    assert rejected.status_code == 403
+
+    accepted = await client.post(
+        "/api/v1/categories",
+        json={"name": "Cookie Category"},
+        headers={"X-Nav-Request": "1"},
+    )
+    assert accepted.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_stale_session_cookie_is_treated_as_anonymous(client):
+    """An invalid cookie must not break public endpoints."""
+    client.cookies.set("nav_session", "not-a-jwt")
+    response = await client.get("/api/v1/links")
+    assert response.status_code == 200
+
+    me_response = await client.get("/api/v1/auth/me")
+    assert me_response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_cookie_logout_revokes_session(client):
+    """Logout should revoke the cookie token and clear the cookie."""
+    login_response = await client.post("/api/v1/auth/login", json={"username": "admin", "password": "admin123"})
+    session_token = login_response.json()["access_token"]
+
+    logout_response = await client.post("/api/v1/auth/logout")
+    assert logout_response.status_code == 200
+    assert 'nav_session=""' in logout_response.headers["set-cookie"]
+
+    me_response = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {session_token}"})
+    assert me_response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_api_token_endpoint_issues_bearer_token(client, auth_headers):
+    """Logged-in users can mint a bearer token for plugins and scripts."""
+    unauthenticated = await client.post("/api/v1/auth/token")
+    assert unauthenticated.status_code == 401
+
+    response = await client.post("/api/v1/auth/token", headers=auth_headers)
+    assert response.status_code == 200
+    token = response.json()["access_token"]
+
+    me_response = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me_response.status_code == 200

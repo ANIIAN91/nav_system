@@ -20,6 +20,7 @@ DEFAULT_SETTINGS = {
     "protected_article_paths": [],
     "github_url": GITHUB_URL,
     "timezone": "Asia/Shanghai",
+    "private_mode": True,
 }
 
 PUBLIC_SETTING_KEYS = (
@@ -30,6 +31,7 @@ PUBLIC_SETTING_KEYS = (
     "link_size",
     "github_url",
     "timezone",
+    "private_mode",
     "version",
 )
 
@@ -79,6 +81,7 @@ class SettingsService:
         row.link_size = normalized["link_size"]
         row.timezone = normalized["timezone"]
         row.github_url = normalized["github_url"]
+        row.private_mode = normalized["private_mode"]
         row.protected_article_paths_json = json.dumps(
             normalized["protected_article_paths"], ensure_ascii=False
         )
@@ -106,6 +109,7 @@ class SettingsService:
             link_size=seed["link_size"],
             timezone=seed["timezone"],
             github_url=seed["github_url"],
+            private_mode=seed["private_mode"],
             protected_article_paths_json=json.dumps(seed["protected_article_paths"], ensure_ascii=False),
         )
         self.db.add(row)
@@ -126,6 +130,7 @@ class SettingsService:
             "protected_article_paths": protected_paths,
             "github_url": row.github_url or DEFAULT_SETTINGS["github_url"],
             "timezone": row.timezone or DEFAULT_SETTINGS["timezone"],
+            "private_mode": DEFAULT_SETTINGS["private_mode"] if row.private_mode is None else bool(row.private_mode),
         }
 
     def _hydrate_defaults(self, payload: dict) -> dict:

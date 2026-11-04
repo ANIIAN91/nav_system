@@ -24,7 +24,7 @@ class NavigationDomainService:
     async def get_category_by_name(self, name: str):
         return await self.repository.get_category_by_name(name)
 
-    async def create_category(self, name: str, auth_required: bool = False):
+    async def create_category(self, name: str, auth_required: bool = True):
         sort_order = await self.repository.get_max_category_order() + 1
         category = await self.repository.create_category(name, auth_required, sort_order)
         invalidate_links_cache()
@@ -62,6 +62,12 @@ class NavigationDomainService:
         link = await self.repository.create_link(category.id, title, url, icon, sort_order, link_id)
         invalidate_links_cache()
         return self._serialize_link(link)
+
+    async def get_link_urls(self, category_name: str) -> set[str]:
+        category = await self.repository.get_category_by_name(category_name)
+        if category is None:
+            return set()
+        return set(await self.repository.list_link_urls_in_category(category.id))
 
     async def get_link_by_id(self, link_id: str):
         return await self.repository.get_link_by_id(link_id)

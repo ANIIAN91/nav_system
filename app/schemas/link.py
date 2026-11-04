@@ -8,7 +8,8 @@ class LinkBase(BaseModel):
     icon: Optional[str] = None
 
 class LinkCreate(LinkBase):
-    pass
+    title: Optional[str] = None  # 留空时自动抓取网页标题
+    fetch_icon: bool = False  # 未提供图标时自动抓取（快速添加使用）
 
 class LinkUpdate(BaseModel):
     title: str

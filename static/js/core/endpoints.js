@@ -24,6 +24,7 @@ export const endpoints = {
         login: () => `${API_PREFIX}/auth/login`,
         logout: () => `${API_PREFIX}/auth/logout`,
         me: () => `${API_PREFIX}/auth/me`,
+        apiToken: () => `${API_PREFIX}/auth/token`,
         cleanupTokens: () => `${API_PREFIX}/auth/cleanup-tokens`,
     },
     settings: {

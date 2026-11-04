@@ -2,7 +2,7 @@
 
 import httpx
 
-from app.utils.favicon import MAX_FAVICON_BYTES, _icon_urls_from_html, _validated_icon_extension
+from app.utils.favicon import MAX_FAVICON_BYTES, _parse_page, _validated_icon_extension
 
 
 def make_response(content_type: str, content: bytes, *, content_length: str | None = None) -> httpx.Response:
@@ -81,9 +81,10 @@ def test_icon_urls_from_html_handles_multi_token_rel_and_relative_href():
     </head></html>
     """
 
-    urls = _icon_urls_from_html("https://example.com/docs/page", html)
+    urls, title = _parse_page("https://example.com/docs/page", html)
 
     assert urls == [
         "https://example.com/assets/favicon.png",
         "https://example.com/docs/touch.png",
     ]
+    assert title is None

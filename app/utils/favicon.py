@@ -1,8 +1,9 @@
 """Favicon fetching utilities"""
 
 from html.parser import HTMLParser
+import hashlib
+import hmac
 import logging
-import re
 from urllib.parse import quote, urljoin, urlparse
 
 import httpx
@@ -43,14 +44,44 @@ ICON_HEADERS = {
 }
 
 
+def icon_filename(netloc: str, ext: str) -> str:
+    """Name icon files with a keyed hash so public /static/icons URLs do not reveal domains."""
+    digest = hmac.new(
+        get_settings().secret_key.encode("utf-8"),
+        netloc.lower().encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return digest[:32] + ext
+
+
 class IconLinkParser(HTMLParser):
-    """Extract common favicon link tags from a page head."""
+    """Extract common favicon link tags and the page title from a page head."""
 
     def __init__(self) -> None:
         super().__init__()
         self.hrefs: list[str] = []
+        self._title_parts: list[str] = []
+        self._in_title = False
+        self._title_done = False
+
+    @property
+    def title(self) -> str | None:
+        title = " ".join("".join(self._title_parts).split())
+        return title[:200] or None
+
+    def handle_data(self, data: str) -> None:
+        if self._in_title:
+            self._title_parts.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() == "title" and self._in_title:
+            self._in_title = False
+            self._title_done = True
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag.lower() == "title" and not self._title_done:
+            self._in_title = True
+            return
         if tag.lower() != "link":
             return
 
@@ -165,7 +196,7 @@ async def _safe_get(
             return await _get_with_safe_redirects(client, url, headers=headers)
 
 
-def _icon_urls_from_html(page_url: str, html: str) -> list[str]:
+def _parse_page(page_url: str, html: str) -> tuple[list[str], str | None]:
     parser = IconLinkParser()
     parser.feed(html)
 
@@ -179,7 +210,7 @@ def _icon_urls_from_html(page_url: str, html: str) -> list[str]:
             urls.append(icon_url)
             seen.add(icon_url)
             logger.info(f"Found icon in HTML: {icon_url}")
-    return urls
+    return urls, parser.title
 
 
 async def fetch_favicon(url: str) -> dict:
@@ -205,11 +236,13 @@ async def fetch_favicon(url: str) -> dict:
             f"{base_url}/apple-touch-icon.png",
         ]
 
-        # Try to parse icon links from HTML
+        # Try to parse icon links and the page title from HTML
+        page_title = None
         try:
             response = await _safe_get(url, headers=HTML_HEADERS, timeout=15.0)
             if response.status_code == 200:
-                icon_urls = _icon_urls_from_html(str(response.url), response.text) + icon_urls
+                html_icon_urls, page_title = _parse_page(str(response.url), response.text)
+                icon_urls = html_icon_urls + icon_urls
         except httpx.TimeoutException:
             logger.warning(f"Timeout while fetching HTML from {url}")
         except httpx.HTTPError as e:
@@ -227,14 +260,14 @@ async def fetch_favicon(url: str) -> dict:
                 response = await _safe_get(icon_url, headers=ICON_HEADERS, timeout=15.0)
                 ext, validation_error = _validated_icon_extension(response)
                 if ext:
-                    filename = re.sub(r"[^a-zA-Z0-9_-]+", "_", parsed.netloc).strip("_") + ext
+                    filename = icon_filename(parsed.netloc, ext)
                     filepath = icons_dir / filename
 
                     with open(filepath, "wb") as f:
                         f.write(response.content)
 
                     logger.info(f"Successfully fetched icon from {icon_url} -> {filename}")
-                    return {"icon": filename, "message": "图标获取成功"}
+                    return {"icon": filename, "title": page_title, "message": "图标获取成功"}
                 else:
                     last_error = validation_error
             except httpx.TimeoutException:
@@ -248,24 +281,26 @@ async def fetch_favicon(url: str) -> dict:
                 logger.warning(f"Error downloading icon from {icon_url}: {e}")
                 continue
 
-        # Try public favicon services as fallbacks. They do not receive the full URL path.
-        fallback_urls = [
-            f"https://icons.duckduckgo.com/ip3/{quote(parsed.hostname or parsed.netloc)}.ico",
-            f"https://www.google.com/s2/favicons?domain={quote(parsed.netloc)}&sz=128",
-        ]
+        # Public favicon services are opt-in: they receive the domain (not the full path)
+        fallback_urls = []
+        if get_settings().favicon_public_fallback:
+            fallback_urls = [
+                f"https://icons.duckduckgo.com/ip3/{quote(parsed.hostname or parsed.netloc)}.ico",
+                f"https://www.google.com/s2/favicons?domain={quote(parsed.netloc)}&sz=128",
+            ]
         for fallback_url in fallback_urls:
             try:
                 response = await _safe_get(fallback_url, headers=ICON_HEADERS, timeout=10.0)
                 ext, validation_error = _validated_icon_extension(response)
                 if ext:
-                    filename = re.sub(r"[^a-zA-Z0-9_-]+", "_", parsed.netloc).strip("_") + ext
+                    filename = icon_filename(parsed.netloc, ext)
                     filepath = icons_dir / filename
 
                     with open(filepath, "wb") as f:
                         f.write(response.content)
 
                     logger.info(f"Successfully fetched icon from fallback service -> {filename}")
-                    return {"icon": filename, "message": "图标获取成功 (使用备用服务)"}
+                    return {"icon": filename, "title": page_title, "message": "图标获取成功 (使用备用服务)"}
                 last_error = validation_error
             except Exception as e:
                 last_error = str(e)
@@ -275,7 +310,7 @@ async def fetch_favicon(url: str) -> dict:
         if last_error:
             error_msg += f" ({last_error})"
         logger.info(f"Failed to fetch favicon for {url}: {error_msg}")
-        return {"icon": None, "message": error_msg}
+        return {"icon": None, "title": page_title, "message": error_msg}
 
     except Exception as e:
         logger.error(f"Unexpected error in fetch_favicon for {url}: {e}", exc_info=True)

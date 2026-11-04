@@ -1,5 +1,5 @@
 import { endpoints } from "../../core/endpoints.js";
-import { apiFetch, parseJson } from "../../core/auth-session-20260425c.js";
+import { apiFetch, parseJson } from "../../core/auth-session-20261103.js";
 import { closeModal, openModal } from "../../ui/modal.js";
 import { showToast } from "../../ui/toast.js";
 

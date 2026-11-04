@@ -10,41 +10,21 @@ function normalizeStoredValue(value) {
     return trimmed ? trimmed : null;
 }
 
-function readStorage(key) {
-    return normalizeStoredValue(localStorage.getItem(key))
-        || normalizeStoredValue(sessionStorage.getItem(key));
-}
-
-export function getToken() {
-    return readStorage("token");
-}
-
-export function getUsername() {
-    return readStorage("username");
-}
-
-export function isAuthenticated() {
-    return Boolean(getToken());
-}
-
 export function setUnauthorizedHandler(handler) {
     unauthorizedHandler = handler;
 }
 
+// 登录态保存在服务端设置的 HttpOnly Cookie 中，前端不接触 Token
 export async function apiFetch(
     url,
     { method = "GET", json, body, headers = {}, auth = true } = {}
 ) {
-    const requestHeaders = { ...headers };
+    // 配合服务端 Cookie 会话的 CSRF 校验
+    const requestHeaders = { "X-Nav-Request": "1", ...headers };
     if (json !== undefined) {
         requestHeaders["Content-Type"] = "application/json";
     } else if (body !== undefined && !requestHeaders["Content-Type"]) {
         requestHeaders["Content-Type"] = "application/json";
-    }
-
-    const token = auth ? getToken() : null;
-    if (token) {
-        requestHeaders.Authorization = `Bearer ${token}`;
     }
 
     const response = await fetch(url, {
@@ -68,37 +48,14 @@ export async function parseJson(response, fallbackMessage) {
     return data;
 }
 
-export function storeSession(token, username) {
-    clearSession();
-    if (token) {
-        localStorage.setItem("token", token);
-    }
-    if (username) {
-        localStorage.setItem("username", username);
-    }
-}
-
-function writeUsernameForCurrentToken(username) {
-    const normalizedUsername = normalizeStoredValue(username);
-    if (!normalizedUsername) {
-        return;
-    }
-
-    const tokenInSession = normalizeStoredValue(sessionStorage.getItem("token"));
-    const storage = tokenInSession ? sessionStorage : localStorage;
-    storage.setItem("username", normalizedUsername);
-}
-
-export function clearSession() {
+export function cleanupLegacyCredentialStorage() {
+    localStorage.removeItem("savedPassword");
+    localStorage.removeItem("rememberCredentials");
+    // 旧版本把 JWT 存在浏览器存储中
     localStorage.removeItem("token");
     localStorage.removeItem("username");
     sessionStorage.removeItem("token");
     sessionStorage.removeItem("username");
-}
-
-export function cleanupLegacyCredentialStorage() {
-    localStorage.removeItem("savedPassword");
-    localStorage.removeItem("rememberCredentials");
 }
 
 export function loadSavedUsername() {
@@ -119,43 +76,20 @@ export function clearRememberedUsername() {
     localStorage.removeItem("rememberUsername");
 }
 
-export async function revokeSession(token = getToken()) {
-    if (!token) {
-        return;
-    }
-    await fetch(endpoints.auth.logout(), {
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    });
+export async function revokeSession() {
+    await fetch(endpoints.auth.logout(), { method: "POST" });
 }
 
-export async function validateStoredSession(token = getToken()) {
-    if (!token) {
-        return null;
-    }
-
+// 通过 /auth/me 查询 Cookie 会话对应的用户，未登录或会话失效时返回 null
+export async function fetchSessionUser() {
     try {
-        const response = await fetch(endpoints.auth.me(), {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        });
-
+        const response = await fetch(endpoints.auth.me());
         if (!response.ok) {
-            clearSession();
             return null;
         }
-
         const data = await response.json().catch(() => ({}));
-        writeUsernameForCurrentToken(data.username);
-        return {
-            token,
-            username: normalizeStoredValue(data.username) || getUsername(),
-        };
+        return normalizeStoredValue(data.username);
     } catch {
-        clearSession();
         return null;
     }
 }

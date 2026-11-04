@@ -18,6 +18,12 @@
                     记住用户名
                 </label>
             </div>
+            <div class="form-group checkbox-group">
+                <label>
+                    <input type="checkbox" id="keep-logged-in" name="keep_logged_in" checked>
+                    保持登录（公共设备请取消）
+                </label>
+            </div>
             <button type="submit" class="btn btn-primary">登录</button>
             <p id="login-error" class="error"></p>
         </form>
@@ -48,8 +54,8 @@
                             <select id="link-category" name="category" required></select>
                         </div>
                         <div class="form-group">
-                            <label for="link-title">标题</label>
-                            <input type="text" id="link-title" name="title" required>
+                            <label for="link-title">标题（可选）</label>
+                            <input type="text" id="link-title" name="title" placeholder="留空自动获取网页标题">
                         </div>
                         <div class="form-group">
                             <label for="link-url">URL</label>
@@ -63,6 +69,12 @@
                         </div>
                         <button type="submit" class="btn btn-primary">添加</button>
                     </form>
+                    <hr class="subtle-divider">
+                    <div class="form-group">
+                        <label>书签小工具</label>
+                        <a id="bookmarklet-link" class="btn btn-secondary" href="#">收藏到导航</a>
+                        <small class="form-help">把按钮拖到浏览器书签栏；浏览任意网页时点击它，即可在小窗口中把当前页面收藏到导航。</small>
+                    </div>
                 </div>
                 <div id="add-category" class="tab-content">
                     <form id="add-category-form">
@@ -72,7 +84,7 @@
                         </div>
                         <div class="form-group">
                             <label>
-                                <input type="checkbox" id="category-auth" name="auth_required">
+                                <input type="checkbox" id="category-auth" name="auth_required" checked>
                                 需要登录才可见
                             </label>
                         </div>
@@ -112,6 +124,12 @@
                 </div>
                 <div id="site-settings" class="tab-content">
                     <form id="edit-footer-form">
+                        <div class="form-group checkbox-group">
+                            <label>
+                                <input type="checkbox" id="private-mode" name="private_mode">
+                                私有模式：未登录访客看不到任何导航链接
+                            </label>
+                        </div>
                         <div class="form-group">
                             <label for="site-title">网站标题</label>
                             <input type="text" id="site-title" name="site_title" placeholder="例如: 个人主页导航">
@@ -184,22 +202,24 @@
                     <hr class="subtle-divider">
                     <div class="form-group">
                         <label>导入</label>
-                        <input type="file" id="import-file" accept=".json" class="input-file">
+                        <input type="file" id="import-file" accept=".json,.html,.htm" class="input-file">
                         <div class="inline-actions">
                             <button type="button" id="import-native-btn" class="btn btn-secondary">导入(原生格式)</button>
                             <button type="button" id="import-sunpanel-btn" class="btn btn-secondary">导入(SunPanel)</button>
+                            <button type="button" id="import-bookmarks-btn" class="btn btn-secondary">导入(浏览器书签 HTML)</button>
                         </div>
+                        <small class="form-help">浏览器书签按所在文件夹生成分类，默认私有；同一分类中已存在的网址会跳过。</small>
                         <small id="import-status" class="form-help"></small>
                     </div>
                     <hr class="subtle-divider">
                     <div class="form-group">
                         <label>API Token（用于 Obsidian 插件或脚本同步）</label>
                         <div class="token-row">
-                            <input type="text" id="jwt-token-display" class="token-display" readonly>
-                            <button type="button" id="toggle-token-btn" class="btn btn-secondary">显示 Token</button>
+                            <input type="text" id="api-token-display" class="token-display" placeholder="点击“生成”获取新 Token" readonly>
+                            <button type="button" id="generate-token-btn" class="btn btn-secondary">生成</button>
                             <button type="button" id="copy-token-btn" class="btn btn-secondary">复制</button>
                         </div>
-                        <small class="form-help">此 Token 用于 Obsidian 插件或 Python 脚本同步文章</small>
+                        <small class="form-help">此 Token 用于 Obsidian 插件或 Python 脚本同步文章，有效期与登录相同，请勿泄露</small>
                     </div>
                 </div>
                 <div id="visit-log" class="tab-content">
@@ -295,6 +315,29 @@
                     <button type="button" id="link-move-down-btn" class="btn btn-secondary">下移</button>
                 </div>
             </div>
+        </form>
+    </div>
+</div>
+
+<!-- 快速添加弹窗 -->
+<div id="quick-add-modal" class="modal" role="dialog" aria-labelledby="quick-add-modal-title" aria-modal="true">
+    <div class="modal-content">
+        <button type="button" class="close" aria-label="关闭">&times;</button>
+        <h2 id="quick-add-modal-title">添加链接</h2>
+        <form id="quick-add-form">
+            <div class="form-group">
+                <label for="quick-add-url">网址</label>
+                <input type="text" id="quick-add-url" name="url" inputmode="url" required placeholder="粘贴网址，标题和图标会自动获取">
+            </div>
+            <div class="form-group">
+                <label for="quick-add-title">标题（可选）</label>
+                <input type="text" id="quick-add-title" name="title" placeholder="留空自动获取">
+            </div>
+            <div class="form-group">
+                <label for="quick-add-category">分类</label>
+                <select id="quick-add-category" name="category" required></select>
+            </div>
+            <button type="submit" id="quick-add-submit" class="btn btn-primary">添加</button>
         </form>
     </div>
 </div>

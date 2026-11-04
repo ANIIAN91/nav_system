@@ -38,6 +38,7 @@ class Settings:
     max_update_records: int
     enable_log_cleanup: bool
     log_cleanup_interval_seconds: int
+    favicon_public_fallback: bool
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -63,6 +64,8 @@ class Settings:
             max_update_records=int(os.getenv("MAX_UPDATE_RECORDS", "500")),
             enable_log_cleanup=os.getenv("ENABLE_LOG_CLEANUP", "true").lower() == "true",
             log_cleanup_interval_seconds=int(os.getenv("LOG_CLEANUP_INTERVAL_SECONDS", "21600")),
+            # 公共图标服务兜底会把域名发给第三方，默认关闭
+            favicon_public_fallback=os.getenv("FAVICON_PUBLIC_FALLBACK", "false").lower() == "true",
         )
 
 

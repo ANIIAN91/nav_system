@@ -257,6 +257,12 @@ body.home-v6 .toolbar-btn:hover {
     box-shadow: none;
 }
 
+body.home-v6 .toolbar-btn.is-active {
+    color: var(--home-accent);
+    border-color: rgba(215, 173, 87, 0.45);
+    background: var(--home-accent-soft);
+}
+
 body.home-v6 #login-btn.toolbar-btn {
     background: var(--home-accent);
     color: #16130d;
@@ -503,9 +509,14 @@ body.home-v6 .category-nav-item.active {
     border-color: rgba(215, 173, 87, 0.3);
 }
 
+/* 分类默认私有，只给公开分类加“公开”标记 */
 body.home-v6 .category-nav-item .auth-badge {
-    background: var(--home-accent-soft);
-    color: var(--home-accent);
+    padding: 0 6px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    color: var(--home-success);
+    font-size: 0.68rem;
+    line-height: 1.5;
 }
 
 body.home-v6 .category-edit-icon {
@@ -624,11 +635,17 @@ body.home-v6 .link-icon {
     box-shadow: none;
 }
 
+/* 图片图标使用浅色衬底 + contain，深色/透明图标（GitHub、Notion）在暗色主题下也清晰 */
+body.home-v6 .link-icon:has(img) {
+    background: #ece7dc;
+    border-color: transparent;
+}
+
 body.home-v6 .link-icon img {
-    width: 100%;
-    height: 100%;
-    border-radius: inherit;
-    object-fit: cover;
+    width: 78%;
+    height: 78%;
+    border-radius: 6px;
+    object-fit: contain;
 }
 
 body.home-v6 .links-grid.size-small .link-item {
@@ -717,8 +734,65 @@ body.home-v6 .link-item .edit-btn {
     box-shadow: none;
 }
 
-body.home-v6 .link-item:hover .edit-btn {
+body.home-v6 .link-item .delete-btn {
+    position: absolute;
+    top: 8px;
+    right: 42px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 8px;
+    background: var(--home-danger-soft);
+    color: var(--home-danger);
+    border: 1px solid rgba(255, 143, 122, 0.35);
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+/* 编辑模式：显示编辑/删除按钮，卡片高亮，可拖拽排序 */
+body.home-v6.edit-mode .link-item .edit-btn,
+body.home-v6.edit-mode .link-item .delete-btn {
     display: inline-flex;
+}
+
+body.home-v6.edit-mode .link-item:not(.link-add) {
+    border-color: rgba(215, 173, 87, 0.45);
+    cursor: move;
+}
+
+body.home-v6.edit-mode .link-item:not(.link-add) .link-card-copy {
+    padding-right: 64px;
+}
+
+/* 分类末尾的快速添加卡片 */
+body.home-v6 .link-item.link-add {
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    background: transparent;
+    border-style: dashed;
+    color: var(--home-muted);
+    opacity: 0.7;
+}
+
+body.home-v6 .link-item.link-add:hover {
+    opacity: 1;
+    transform: none;
+}
+
+body.home-v6 .link-item.link-add .link-icon {
+    font-size: 1.2rem;
+    font-weight: 400;
+    color: var(--home-muted);
+    border-style: dashed;
+}
+
+body.home-v6 .link-item.link-add .link-title {
+    color: var(--home-muted);
 }
 
 body.home-v6 .empty-state {
@@ -739,6 +813,16 @@ body.home-v6 .empty-copy {
     margin-top: 8px;
     color: var(--home-muted);
     font-size: 0.84rem;
+}
+
+body.home-v6 .empty-action {
+    margin-top: 16px;
+}
+
+/* 链接区是横向 flex 容器，空状态需占满宽度、高度随内容 */
+body.home-v6 .links-container > .empty-state {
+    flex: 1;
+    align-self: flex-start;
 }
 
 body.home-v6 .modal {
@@ -1509,6 +1593,26 @@ body.home-v6 .toast.info {
     border-color: rgba(215, 173, 87, 0.32);
 }
 
+/* Toast 操作按钮（如“撤销”） */
+body.home-v6 .toast.has-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    pointer-events: auto;
+}
+
+body.home-v6 .toast-action {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--home-text);
+    font: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
 body.home-v6 .skeleton-nav,
 body.home-v6 .skeleton-links {
     display: contents;
@@ -1591,11 +1695,26 @@ body.home-v6 .skeleton-article {
         min-width: 100%;
     }
 
-    body.home-v6 .clock-badge,
-    body.home-v6 .toolbar-btn,
+    /* 手机端顶栏：搜索框独占一行，时钟和按钮紧凑排成一行 */
+    body.home-v6 .topright {
+        gap: 6px;
+        justify-content: flex-start;
+    }
+
+    body.home-v6 .search-box .search-hint,
     body.home-v6 .user-chip {
-        width: 100%;
-        justify-content: center;
+        display: none;
+    }
+
+    body.home-v6 .clock-badge {
+        min-width: 0;
+        margin-right: auto;
+        padding: 6px 10px;
+    }
+
+    body.home-v6 .toolbar-btn {
+        min-height: 34px;
+        padding: 6px 10px;
     }
 
     body.home-v6 .section-head {
@@ -1670,8 +1789,8 @@ body.home-v6 .skeleton-article {
         grid-template-columns: 1fr;
     }
 
-    body.logged-in.home-v6 .link-item .edit-btn {
-        display: inline-flex;
-        opacity: 0.84;
+    body.home-v6.edit-mode .link-item .edit-btn,
+    body.home-v6.edit-mode .link-item .delete-btn {
+        opacity: 0.9;
     }
 }

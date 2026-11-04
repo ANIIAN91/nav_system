@@ -47,6 +47,7 @@ async def add_link(
             url=link.url,
             icon=link.icon,
             username=username,
+            fetch_icon=link.fetch_icon,
         )
     except ApplicationError as exc:
         raise_http_error(exc)

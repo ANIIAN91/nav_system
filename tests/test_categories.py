@@ -113,6 +113,13 @@ async def test_batch_reorder_categories_rejects_partial_payload(client, auth_hea
 @pytest.mark.asyncio
 async def test_category_visibility_depends_on_authentication(client, auth_headers):
     """Private categories should be hidden from unauthenticated responses."""
+    settings_response = await client.put(
+        "/api/v1/settings",
+        json={"private_mode": False},
+        headers=auth_headers,
+    )
+    assert settings_response.status_code == 200
+
     public_response = await client.post(
         "/api/v1/categories",
         json={"name": "Public Category", "auth_required": False},
@@ -138,3 +145,40 @@ async def test_category_visibility_depends_on_authentication(client, auth_header
     authenticated_names = [category["name"] for category in authenticated_list.json()["categories"]]
     assert "Public Category" in authenticated_names
     assert "Private Category" in authenticated_names
+
+
+@pytest.mark.asyncio
+async def test_private_mode_hides_all_categories_by_default(client, auth_headers):
+    """Private mode is on by default, so anonymous visitors see no categories at all."""
+    response = await client.post(
+        "/api/v1/categories",
+        json={"name": "Public Category", "auth_required": False},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+
+    anonymous_list = await client.get("/api/v1/links")
+    assert anonymous_list.status_code == 200
+    assert anonymous_list.json()["categories"] == []
+
+    authenticated_list = await client.get("/api/v1/links", headers=auth_headers)
+    assert [c["name"] for c in authenticated_list.json()["categories"]] == ["Public Category"]
+
+
+@pytest.mark.asyncio
+async def test_new_categories_default_to_private(client, auth_headers):
+    """Categories created without an explicit flag, or implicitly via add-link, require login."""
+    explicit = await client.post("/api/v1/categories", json={"name": "No Flag"}, headers=auth_headers)
+    assert explicit.status_code == 200
+    assert explicit.json()["category"]["auth_required"] is True
+
+    implicit = await client.post(
+        "/api/v1/links?category_name=Implicit",
+        json={"title": "Example", "url": "https://example.com"},
+        headers=auth_headers,
+    )
+    assert implicit.status_code == 200
+
+    listing = await client.get("/api/v1/links", headers=auth_headers)
+    flags = {c["name"]: c["auth_required"] for c in listing.json()["categories"]}
+    assert flags == {"No Flag": True, "Implicit": True}

@@ -400,7 +400,7 @@ class NavSystemSyncSettingTab extends PluginSettingTab {
 
         // 使用说明
         containerEl.createEl('h3', { text: '使用说明' });
-        containerEl.createEl('p', { text: '1. 在 Nav System 登录后，从浏览器开发者工具获取 JWT Token' });
+        containerEl.createEl('p', { text: '1. 在 Nav System 登录后，于“管理 → 导入导出”点击“生成”获取 API Token' });
         containerEl.createEl('p', { text: '2. 使用命令面板（Ctrl/Cmd + P）搜索 "Nav System" 相关命令' });
         containerEl.createEl('p', { text: '3. 或右键文件/编辑器选择 "上传到 Nav System"' });
     }

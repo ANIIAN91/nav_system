@@ -7,7 +7,7 @@ CATEGORY_NAME_ERROR = "分类名称不能为空，且不能包含 / 或 \\"
 
 class CategoryBase(BaseModel):
     name: str
-    auth_required: bool = False
+    auth_required: bool = True  # 新分类默认需要登录
 
     @field_validator("name")
     @classmethod

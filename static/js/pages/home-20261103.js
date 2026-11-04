@@ -1,32 +1,34 @@
 import {
     apiFetch,
     clearRememberedUsername,
-    clearSession,
     cleanupLegacyCredentialStorage,
-    getToken,
-    getUsername,
+    fetchSessionUser,
     loadSavedUsername,
     revokeSession,
     setRememberedUsername,
     setUnauthorizedHandler,
-    storeSession,
-    validateStoredSession,
-} from "../core/auth-session-20260425c.js";
-import { endpoints } from "../core/endpoints.js";
+} from "../core/auth-session-20261103.js";
+import { endpoints } from "../core/endpoints.js?v=20261103";
 import {
     initArticleManager,
     loadManageArticles,
     loadManageFolders,
     refreshArticleManagerData,
-} from "./home/article-manager-20260425c.js";
-import { initArticleSheet, maybeOpenArticleFromLocation, openArticleSheet } from "./home/article-sheet-20260425c.js";
+} from "./home/article-manager-20261103.js";
+import { initArticleSheet, maybeOpenArticleFromLocation, openArticleSheet } from "./home/article-sheet-20261103.js";
 import { closeModal, initModalSystem, openModal } from "../ui/modal.js";
 import { initTheme, toggleTheme } from "../ui/theme.js";
-import { showToast } from "../ui/toast.js";
+import { showToast } from "../ui/toast.js?v=20261103";
+
+// 搜索无匹配时回车使用的搜索引擎
+const SEARCH_ENGINE_URL = "https://www.bing.com/search?q=";
 
 const state = {
-    token: getToken(),
-    username: getUsername(),
+    authenticated: false,
+    username: null,
+    editMode: false,
+    pendingAdd: null,
+    pendingAddFromBookmarklet: false,
     links: { categories: [] },
     articles: [],
     settings: { link_size: "medium", protected_article_paths: [] },
@@ -46,9 +48,10 @@ function isSafeUrl(url) {
     }
 }
 
-function syncAuthState() {
-    state.token = getToken();
-    state.username = getUsername();
+async function refreshSession() {
+    const username = await fetchSessionUser();
+    state.authenticated = Boolean(username);
+    state.username = username;
 }
 
 function setStatusTone(element, tone = "muted") {
@@ -85,7 +88,7 @@ function getFilteredArticles() {
 }
 
 function hasValidToken() {
-    return Boolean(state.token && state.token.trim().length > 0);
+    return state.authenticated;
 }
 
 function getVisibleCategories() {
@@ -157,20 +160,13 @@ async function api(url, options = {}) {
     return response;
 }
 
-async function validateInitialSession() {
-    const token = getToken();
-    if (token) {
-        await validateStoredSession(token);
-    }
-    syncAuthState();
-}
 
 setUnauthorizedHandler(async () => {
     if (unauthorizedLogoutPromise) {
         await unauthorizedLogoutPromise;
         return;
     }
-    if (!state.token && !getToken()) {
+    if (!state.authenticated) {
         return;
     }
 
@@ -221,13 +217,14 @@ updateClock();
 
 // 更新 UI 状态
 function updateUI() {
-    syncAuthState();
     const loginBtn = document.getElementById('login-btn');
     const logoutBtn = document.getElementById('logout-btn');
     const manageBtn = document.getElementById('manage-btn');
+    const editModeBtn = document.getElementById('edit-mode-btn');
     const usernameDisplay = document.getElementById('username-display');
 
-    if (state.token) {
+    editModeBtn.hidden = !state.authenticated;
+    if (state.authenticated) {
         loginBtn.hidden = true;
         logoutBtn.hidden = false;
         manageBtn.hidden = false;
@@ -302,14 +299,13 @@ function renderCategoryNav() {
 
     const visibleCategories = getVisibleCategories();
 
+    // 没有可见分类时隐藏分类栏，由链接区给出唯一的空状态提示
+    const categoryNav = document.getElementById('category-nav');
+    if (categoryNav) {
+        categoryNav.hidden = visibleCategories.length === 0;
+    }
     if (visibleCategories.length === 0) {
         state.currentCategory = null;
-        navContainer.innerHTML = `
-            <div class="empty-state category-empty">
-                <div class="empty-title">暂无可见分类</div>
-                <div class="empty-copy">添加分类后会显示在这里。</div>
-            </div>
-        `;
         return;
     }
 
@@ -330,15 +326,16 @@ function renderCategoryNav() {
         textSpan.textContent = category.name;
         btn.appendChild(textSpan);
 
-        if (category.auth_required) {
+        // 分类默认私有，只标记公开分类
+        if (!category.auth_required) {
             const badge = document.createElement('span');
             badge.className = 'auth-badge';
-            badge.textContent = '私密';
+            badge.textContent = '公开';
             btn.appendChild(badge);
         }
 
-        // 添加编辑按钮（仅登录状态且为当前分类）
-        if (hasValidToken() && state.currentCategory === category.name) {
+        // 添加编辑按钮（仅编辑模式且为当前分类）
+        if (state.editMode && state.currentCategory === category.name) {
             const editBtn = document.createElement('button');
             editBtn.className = 'category-edit-icon';
             editBtn.innerHTML = '&#9998;';
@@ -370,9 +367,12 @@ function renderCategoryNav() {
         });
     });
 
-    // 如果已登录，初始化分类导航栏的拖拽排序
-    if (hasValidToken()) {
+    // 编辑模式下初始化分类导航栏的拖拽排序
+    if (state.editMode) {
         initCategoryNavDragAndDrop();
+    } else if (navContainer.sortableInstance) {
+        navContainer.sortableInstance.destroy();
+        navContainer.sortableInstance = null;
     }
 
 }
@@ -437,12 +437,7 @@ function renderLinks() {
     const categoriesToShow = getRenderableCategories();
 
     if (categoriesToShow.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-title">没有匹配的导航项</div>
-                <div class="empty-copy">试试切换分类，或者换一个搜索词。</div>
-            </div>
-        `;
+        container.appendChild(createLinksEmptyState(searchTerm));
         updateCategorySelect();
         return;
     }
@@ -468,6 +463,10 @@ function renderLinks() {
             linkEl.rel = 'noopener noreferrer';
             linkEl.className = 'link-item';
             linkEl.dataset.id = link.id || '';
+            linkEl.addEventListener('click', (e) => {
+                // 编辑模式下点击卡片不跳转，避免拖拽时误打开
+                if (state.editMode) e.preventDefault();
+            });
 
             const iconDiv = document.createElement('div');
             iconDiv.className = 'link-icon';
@@ -502,7 +501,18 @@ function renderLinks() {
             linkEl.appendChild(iconDiv);
             linkEl.appendChild(copyDiv);
 
-            if (state.token) {
+            if (state.editMode) {
+                const deleteLinkBtn = document.createElement('button');
+                deleteLinkBtn.className = 'delete-btn';
+                deleteLinkBtn.title = '删除';
+                deleteLinkBtn.innerHTML = '&times;';
+                deleteLinkBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    deleteLinkWithUndo(link.id, category.name);
+                });
+                linkEl.appendChild(deleteLinkBtn);
+
                 const editLinkBtn = document.createElement('button');
                 editLinkBtn.className = 'edit-btn';
                 editLinkBtn.dataset.id = link.id || '';
@@ -517,12 +527,16 @@ function renderLinks() {
             linksGrid.appendChild(linkEl);
         });
 
+        if (state.authenticated && !searchTerm) {
+            linksGrid.appendChild(createQuickAddElement(category.name));
+        }
+
         categoryEl.appendChild(linksGrid);
         container.appendChild(categoryEl);
     });
 
-    if (state.token) {
-        document.querySelectorAll('.edit-btn').forEach(btn => {
+    if (state.editMode) {
+        container.querySelectorAll('.edit-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -530,7 +544,10 @@ function renderLinks() {
             });
         });
 
-        initDragAndDrop();
+        // 搜索结果跨分类，不支持排序
+        if (!searchTerm) {
+            initDragAndDrop();
+        }
     }
 
     updateCategorySelect();
@@ -551,11 +568,11 @@ function updateCategorySelect() {
 }
 
 // 登录
-async function login(username, password, rememberUsername) {
+async function login(username, password, rememberUsername, keepLoggedIn) {
     try {
         const response = await api(endpoints.auth.login(), {
             method: 'POST',
-            body: JSON.stringify({ username, password }),
+            body: JSON.stringify({ username, password, remember: keepLoggedIn }),
             auth: false
         });
 
@@ -564,9 +581,9 @@ async function login(username, password, rememberUsername) {
             throw new Error(data.detail || '登录失败');
         }
 
-        const data = await response.json();
-        storeSession(data.access_token, username);
-        syncAuthState();
+        // 会话由服务端写入 HttpOnly Cookie，前端不保存 Token
+        state.authenticated = true;
+        state.username = username;
 
         // 安全改进：只记住用户名，不存储密码
         // 密码应由浏览器密码管理器处理
@@ -580,8 +597,9 @@ async function login(username, password, rememberUsername) {
         cleanupLegacyCredentialStorage();
 
         updateUI();
-        refreshHomeData();
         closeModal('login-modal');
+        await refreshHomeData();
+        openPendingAdd();
     } catch (error) {
         document.getElementById('login-error').textContent = error.message;
     }
@@ -597,8 +615,9 @@ function loadSavedCredentials() {
 }
 
 function clearAuthState() {
-    clearSession();
-    syncAuthState();
+    state.authenticated = false;
+    state.username = null;
+    setEditMode(false);
 
     // 如果当前在私密分类，退出后切换到第一个非私密分类
     const currentCat = state.links.categories.find(cat => cat.name === state.currentCategory);
@@ -616,11 +635,9 @@ function clearAuthState() {
 
 // 登出
 async function logout({ revoke = true, silent = false } = {}) {
-    const token = state.token;
-
-    if (revoke && token) {
+    if (revoke) {
         try {
-            await revokeSession(token);
+            await revokeSession();
         } catch (error) {
             console.warn('调用登出接口失败:', error);
         }
@@ -639,11 +656,12 @@ async function addLink(category, title, url, icon) {
     try {
         const response = await api(endpoints.links.create(category), {
             method: 'POST',
-            body: JSON.stringify({ title, url, icon: icon || null })
+            body: JSON.stringify({ title: title || null, url: normalizeUrlInput(url), icon: icon || null })
         });
 
         if (!response.ok) {
-            throw new Error('添加失败');
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail || '添加失败');
         }
 
         loadLinks();
@@ -653,6 +671,277 @@ async function addLink(category, title, url, icon) {
     } catch (error) {
         showToast(error.message, 'error');
     }
+}
+
+// 补全省略协议的网址，例如 github.com
+function normalizeUrlInput(url) {
+    const trimmed = (url || '').trim();
+    if (!trimmed || /^[a-z][a-z0-9+.-]*:/i.test(trimmed)) {
+        return trimmed;
+    }
+    return 'https://' + trimmed;
+}
+
+function openLoginModal() {
+    loadSavedCredentials();
+    openModal('login-modal');
+}
+
+// 链接区的空状态：区分私有模式、尚无分类和搜索无结果
+function createLinksEmptyState(searchTerm) {
+    const emptyEl = document.createElement('div');
+    emptyEl.className = 'empty-state';
+
+    let title = '没有匹配的导航项';
+    let copy = '试试切换分类，或者换一个搜索词；按回车可用 Bing 搜索。';
+    let withLogin = false;
+    if (!searchTerm && getVisibleCategories().length === 0) {
+        if (state.authenticated) {
+            title = '还没有分类';
+            copy = '点击右上角「管理」添加分类，或导入浏览器书签。';
+        } else if (state.settings.private_mode !== false) {
+            title = '私有模式已开启';
+            copy = '登录后查看导航。';
+            withLogin = true;
+        } else {
+            title = '暂无公开链接';
+            copy = '登录后可查看全部导航。';
+            withLogin = true;
+        }
+    }
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'empty-title';
+    titleEl.textContent = title;
+    const copyEl = document.createElement('div');
+    copyEl.className = 'empty-copy';
+    copyEl.textContent = copy;
+    emptyEl.appendChild(titleEl);
+    emptyEl.appendChild(copyEl);
+
+    if (withLogin) {
+        const loginBtn = document.createElement('button');
+        loginBtn.type = 'button';
+        loginBtn.className = 'btn btn-secondary empty-action';
+        loginBtn.textContent = '登录';
+        loginBtn.addEventListener('click', openLoginModal);
+        emptyEl.appendChild(loginBtn);
+    }
+    return emptyEl;
+}
+
+// 分类末尾的“快速添加”卡片
+function createQuickAddElement(categoryName) {
+    const addEl = document.createElement('button');
+    addEl.type = 'button';
+    addEl.className = 'link-item link-add';
+    addEl.title = `添加链接到「${categoryName}」`;
+
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'link-icon';
+    iconDiv.textContent = '+';
+
+    const copyDiv = document.createElement('div');
+    copyDiv.className = 'link-card-copy';
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'link-title';
+    titleSpan.textContent = '添加链接';
+    const hintSpan = document.createElement('span');
+    hintSpan.className = 'link-url-preview';
+    hintSpan.textContent = '粘贴网址即可';
+    copyDiv.appendChild(titleSpan);
+    copyDiv.appendChild(hintSpan);
+
+    addEl.appendChild(iconDiv);
+    addEl.appendChild(copyDiv);
+    addEl.addEventListener('click', () => openQuickAddModal(categoryName));
+    return addEl;
+}
+
+function openQuickAddModal(categoryName, prefill = {}) {
+    document.getElementById('quick-add-form').reset();
+    const categorySelect = document.getElementById('quick-add-category');
+    categorySelect.innerHTML = '';
+    state.links.categories.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat.name;
+        option.textContent = cat.name;
+        categorySelect.appendChild(option);
+    });
+    if (categoryName) categorySelect.value = categoryName;
+    document.getElementById('quick-add-url').value = prefill.url || '';
+    document.getElementById('quick-add-title').value = prefill.title || '';
+    openModal('quick-add-modal');
+    document.getElementById('quick-add-url').focus();
+}
+
+// 快速添加：只需网址，标题和图标由服务端自动获取
+async function quickAddLink(category, url, title) {
+    const submitBtn = document.getElementById('quick-add-submit');
+    submitBtn.disabled = true;
+    submitBtn.textContent = title ? '添加中...' : '正在获取标题和图标...';
+    try {
+        const response = await api(endpoints.links.create(category), {
+            method: 'POST',
+            body: JSON.stringify({ title: title || null, url: normalizeUrlInput(url), icon: null, fetch_icon: true })
+        });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail || '添加失败');
+        }
+        const data = await response.json();
+        closeModal('quick-add-modal');
+        state.currentCategory = category;
+        await loadLinks();
+        showToast(`已添加「${data.link.title}」`, 'success');
+        // 由书签小工具打开的小窗口，添加完成后自动关闭
+        if (state.pendingAddFromBookmarklet && window.opener) {
+            window.setTimeout(() => window.close(), 800);
+        }
+    } catch (error) {
+        showToast(error.message, 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '添加';
+    }
+}
+
+// 书签小工具：/?add=<url>&title=<title>
+function readPendingAdd() {
+    const params = new URLSearchParams(window.location.search);
+    const url = params.get('add');
+    if (!url) return null;
+    const title = (params.get('title') || '').slice(0, 200);
+    // 只移除书签小工具的参数，保留 ?article= 等其他参数
+    params.delete('add');
+    params.delete('title');
+    const query = params.toString();
+    window.history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : ''));
+    return { url, title };
+}
+
+function openPendingAdd() {
+    if (!state.pendingAdd) return;
+    const prefill = state.pendingAdd;
+    state.pendingAdd = null;
+    if (state.links.categories.length === 0) {
+        showToast('请先在「管理」中添加一个分类', 'error');
+        return;
+    }
+    openQuickAddModal(state.currentCategory, prefill);
+}
+
+function initBookmarklet() {
+    const bookmarklet = document.getElementById('bookmarklet-link');
+    if (!bookmarklet) return;
+    const addUrl = `${window.location.origin}/?add=`;
+    bookmarklet.href = `javascript:(()=>{window.open('${addUrl}'+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title),'nav_add','width=520,height=640')})()`;
+    bookmarklet.addEventListener('click', (e) => {
+        e.preventDefault();
+        showToast('请把按钮拖到浏览器书签栏后再使用', 'info');
+    });
+}
+
+// 编辑模式：显示编辑/删除按钮并启用拖拽排序
+function setEditMode(enabled) {
+    state.editMode = enabled;
+    document.body.classList.toggle('edit-mode', enabled);
+    const editModeBtn = document.getElementById('edit-mode-btn');
+    if (editModeBtn) {
+        editModeBtn.textContent = enabled ? '完成' : '编辑';
+        editModeBtn.classList.toggle('is-active', enabled);
+    }
+}
+
+// 删除链接，并在提示中提供撤销
+async function deleteLinkWithUndo(linkId, categoryName) {
+    const category = state.links.categories.find(cat => cat.name === categoryName);
+    const link = category?.links.find(item => item.id === linkId);
+    if (!link) return;
+    const orderBefore = category.links.map(item => item.id);
+
+    try {
+        const response = await api(endpoints.links.detail(linkId), { method: 'DELETE' });
+        if (!response.ok) {
+            throw new Error('删除失败');
+        }
+        await loadLinks();
+        showToast(`已删除「${link.title}」`, 'info', 6000, {
+            label: '撤销',
+            onClick: () => restoreDeletedLink(link, categoryName, orderBefore),
+        });
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+// 撤销删除：重新创建链接并恢复原来的位置
+async function restoreDeletedLink(link, categoryName, orderBefore) {
+    try {
+        const response = await api(endpoints.links.create(categoryName), {
+            method: 'POST',
+            body: JSON.stringify({ title: link.title, url: link.url, icon: link.icon || null })
+        });
+        if (!response.ok) {
+            throw new Error('撤销失败');
+        }
+        const data = await response.json();
+        await loadLinks();
+
+        const category = state.links.categories.find(cat => cat.name === categoryName);
+        const currentIds = category ? category.links.map(item => item.id) : [];
+        const restoredOrder = orderBefore
+            .map(id => (id === link.id ? data.link.id : id))
+            .filter(id => currentIds.includes(id));
+        currentIds.forEach(id => {
+            if (!restoredOrder.includes(id)) restoredOrder.push(id);
+        });
+        if (restoredOrder.length > 1) {
+            await batchReorderLinks(restoredOrder);
+        }
+        showToast(`已恢复「${link.title}」`, 'success');
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+// 解析浏览器导出的书签 HTML（Netscape Bookmark 格式），按所在文件夹分类
+function parseBookmarksHtml(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const categories = new Map();
+    doc.querySelectorAll('a[href]').forEach(anchor => {
+        const url = (anchor.getAttribute('href') || '').trim();
+        if (!/^https?:\/\//i.test(url)) return;
+        const folder = anchor.closest('dl')?.parentElement?.querySelector(':scope > h3');
+        const rawName = (folder?.textContent || '').trim().replace(/[\/\\]/g, '-');
+        const name = rawName.slice(0, 100) || '书签';
+        if (!categories.has(name)) categories.set(name, []);
+        categories.get(name).push({
+            title: (anchor.textContent || '').trim().slice(0, 200) || url,
+            url,
+        });
+    });
+    return {
+        categories: [...categories].map(([name, links]) => ({ name, auth_required: true, links })),
+    };
+}
+
+// 搜索框回车：打开第一个结果；导航视图无匹配时使用搜索引擎
+function openFirstSearchResult() {
+    const term = (state.searchTerm || '').trim();
+    if (!term) return;
+    if (state.currentView === 'articles') {
+        const [article] = getFilteredArticles();
+        if (article) openArticleSheet(article);
+        return;
+    }
+    const [category] = getRenderableCategories();
+    const link = category?.links[0];
+    if (link) {
+        if (isSafeUrl(link.url)) window.open(link.url, '_blank', 'noopener');
+        return;
+    }
+    window.open(SEARCH_ENGINE_URL + encodeURIComponent(term), '_blank', 'noopener');
 }
 
 // 更新链接
@@ -948,10 +1237,8 @@ async function loadSettings(options = {}) {
             githubEl.appendChild(githubLink);
         }
 
-        // 重新渲染链接以应用大小设置
-        if (state.links.categories.length > 0) {
-            renderLinks();
-        }
+        // 重新渲染链接以应用大小设置和私有模式提示
+        renderLinks();
 
         // 更新时钟以应用时区设置
         updateClock();
@@ -977,7 +1264,7 @@ async function loadAdminSettings() {
 }
 
 // 保存站点设置
-async function saveSettings(icp, copyright, articlePageTitle, siteTitle, linkSize, protectedPaths, githubUrl, timezone) {
+async function saveSettings(icp, copyright, articlePageTitle, siteTitle, linkSize, protectedPaths, githubUrl, timezone, privateMode) {
     try {
         const response = await api(endpoints.settings.update(), {
             method: 'PUT',
@@ -989,7 +1276,8 @@ async function saveSettings(icp, copyright, articlePageTitle, siteTitle, linkSiz
                 link_size: linkSize,
                 protected_article_paths: protectedPaths,
                 github_url: githubUrl,
-                timezone: timezone
+                timezone: timezone,
+                private_mode: privateMode
             })
         });
 
@@ -1015,9 +1303,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         openArticleSheet,
     });
     setHomeView(state.currentView);
-    await validateInitialSession();
+    // 清理旧版本存储在浏览器中的 Token 和密码
+    cleanupLegacyCredentialStorage();
+    state.pendingAdd = readPendingAdd();
+    state.pendingAddFromBookmarklet = Boolean(state.pendingAdd);
+    initBookmarklet();
+    await refreshSession();
     updateUI();
     await refreshHomeData();
+    if (state.pendingAdd) {
+        if (state.authenticated) {
+            openPendingAdd();
+        } else {
+            openLoginModal();
+        }
+    }
+
+    // 编辑模式按钮
+    document.getElementById('edit-mode-btn')?.addEventListener('click', () => {
+        setEditMode(!state.editMode);
+        renderCategoryNav();
+        renderLinks();
+    });
 
     document.querySelectorAll("[data-home-view]").forEach((tab) => {
         tab.addEventListener("click", () => {
@@ -1031,6 +1338,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             state.searchTerm = event.target.value || "";
             renderArticleCards();
             renderLinks();
+        });
+        searchInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                openFirstSearchResult();
+            } else if (event.key === "Escape") {
+                searchInput.value = "";
+                state.searchTerm = "";
+                renderArticleCards();
+                renderLinks();
+                searchInput.blur();
+            }
         });
     }
 
@@ -1052,10 +1371,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // 登录按钮
-    document.getElementById('login-btn')?.addEventListener('click', () => {
-        loadSavedCredentials();
-        openModal('login-modal');
-    });
+    document.getElementById('login-btn')?.addEventListener('click', openLoginModal);
 
     // 登出按钮
     document.getElementById('logout-btn')?.addEventListener('click', () => logout());
@@ -1076,7 +1392,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const linkSizeSelect = document.getElementById('link-size');
         const timezoneSelect = document.getElementById('timezone');
         const protectedPathsInput = document.getElementById('protected-paths');
-        const jwtTokenDisplay = document.getElementById('jwt-token-display');
+        const privateModeInput = document.getElementById('private-mode');
+        const apiTokenDisplay = document.getElementById('api-token-display');
         if (siteTitleInput) siteTitleInput.value = settings.site_title || '个人主页导航';
         if (articleTitleInput) articleTitleInput.value = settings.article_page_title || '文章';
         if (icpInput) icpInput.value = settings.icp || '';
@@ -1085,58 +1402,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (linkSizeSelect) linkSizeSelect.value = settings.link_size || 'medium';
         if (timezoneSelect) timezoneSelect.value = settings.timezone || 'Asia/Shanghai';
         if (protectedPathsInput) protectedPathsInput.value = (settings.protected_article_paths || []).join(',');
-
-        // Security: Hide JWT token by default
-        if (jwtTokenDisplay) {
-            jwtTokenDisplay.value = '••••••••••••••••••••';
-            jwtTokenDisplay.dataset.actualToken = state.token || '';
-            jwtTokenDisplay.dataset.revealed = 'false';
-        }
+        if (privateModeInput) privateModeInput.checked = settings.private_mode !== false;
+        if (apiTokenDisplay) apiTokenDisplay.value = '';
 
         openModal('manage-modal');
     });
 
-    // 复制 Token 按钮
-    document.getElementById('copy-token-btn')?.addEventListener('click', () => {
-        const tokenInput = document.getElementById('jwt-token-display');
-        if (tokenInput) {
-            // Copy the actual token, not the masked value
-            const actualToken = tokenInput.dataset.actualToken || tokenInput.value;
-            if (actualToken && actualToken !== '••••••••••••••••••••') {
-                navigator.clipboard.writeText(actualToken).then(() => {
-                    showToast('Token 已复制到剪贴板', 'success');
-                }).catch(() => {
-                    // Fallback for older browsers
-                    const tempInput = document.createElement('input');
-                    tempInput.value = actualToken;
-                    document.body.appendChild(tempInput);
-                    tempInput.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(tempInput);
-                    showToast('Token 已复制到剪贴板', 'success');
-                });
-            }
+    // 生成 API Token（用于 Obsidian 插件或脚本）
+    document.getElementById('generate-token-btn')?.addEventListener('click', async () => {
+        try {
+            const response = await api(endpoints.auth.apiToken(), { method: 'POST' });
+            if (!response.ok) throw new Error('生成失败');
+            const data = await response.json();
+            document.getElementById('api-token-display').value = data.access_token;
+            showToast('已生成新的 API Token', 'success');
+        } catch (error) {
+            showToast(error.message, 'error');
         }
     });
 
-    // Toggle Token visibility button
-    document.getElementById('toggle-token-btn')?.addEventListener('click', () => {
-        const tokenInput = document.getElementById('jwt-token-display');
-        const toggleBtn = document.getElementById('toggle-token-btn');
-        if (tokenInput && toggleBtn) {
-            const isRevealed = tokenInput.dataset.revealed === 'true';
-            if (isRevealed) {
-                // Hide token
-                tokenInput.value = '••••••••••••••••••••';
-                tokenInput.dataset.revealed = 'false';
-                toggleBtn.textContent = '显示 Token';
-            } else {
-                // Show token
-                tokenInput.value = tokenInput.dataset.actualToken || '';
-                tokenInput.dataset.revealed = 'true';
-                toggleBtn.textContent = '隐藏 Token';
-            }
+    // 复制 Token 按钮
+    document.getElementById('copy-token-btn')?.addEventListener('click', () => {
+        const token = document.getElementById('api-token-display')?.value;
+        if (!token) {
+            showToast('请先生成 Token', 'error');
+            return;
         }
+        navigator.clipboard.writeText(token).then(() => {
+            showToast('Token 已复制到剪贴板', 'success');
+        }).catch(() => {
+            showToast('复制失败，请手动选择复制', 'error');
+        });
     });
 
     // 登录表单
@@ -1145,7 +1441,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
         const rememberCredentials = document.getElementById('remember-credentials').checked;
-        login(username, password, rememberCredentials);
+        const keepLoggedIn = document.getElementById('keep-logged-in').checked;
+        login(username, password, rememberCredentials, keepLoggedIn);
+    });
+
+    // 快速添加表单
+    document.getElementById('quick-add-form')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const category = document.getElementById('quick-add-category').value;
+        const url = document.getElementById('quick-add-url').value;
+        const title = document.getElementById('quick-add-title').value.trim();
+        quickAddLink(category, url, title);
     });
 
     // 添加链接表单
@@ -1249,7 +1555,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const timezone = document.getElementById('timezone').value || 'Asia/Shanghai';
         const protectedPathsStr = document.getElementById('protected-paths').value || '';
         const protectedPaths = protectedPathsStr.split(',').map(p => p.trim()).filter(p => p);
-        saveSettings(icp, copyright, articleTitle, siteTitle, linkSize, protectedPaths, githubUrl, timezone);
+        const privateMode = document.getElementById('private-mode').checked;
+        saveSettings(icp, copyright, articleTitle, siteTitle, linkSize, protectedPaths, githubUrl, timezone, privateMode);
     });
 
     // 导出导航数据
@@ -1273,6 +1580,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 导入导航数据（原生格式）
     document.getElementById('import-native-btn')?.addEventListener('click', () => {
         importLinks('native');
+    });
+
+    // 导入浏览器书签（HTML 格式）
+    document.getElementById('import-bookmarks-btn')?.addEventListener('click', () => {
+        importLinks('bookmarks');
     });
 
     // 导入导航数据（SunPanel 格式）
@@ -1419,11 +1731,16 @@ async function importLinks(format) {
         return;
     }
 
-    // Security: Validate MIME type
-    if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
-        statusEl.textContent = '请选择有效的 JSON 文件';
+    // Security: Validate file type
+    const isBookmarks = format === 'bookmarks';
+    const validType = isBookmarks
+        ? /\.html?$/i.test(file.name)
+        : file.type === 'application/json' || file.name.endsWith('.json');
+    if (!validType) {
+        const message = isBookmarks ? '请选择浏览器导出的书签 HTML 文件' : '请选择有效的 JSON 文件';
+        statusEl.textContent = message;
         setStatusTone(statusEl, 'error');
-        showToast('请选择有效的 JSON 文件', 'error');
+        showToast(message, 'error');
         return;
     }
 
@@ -1432,11 +1749,15 @@ async function importLinks(format) {
         setStatusTone(statusEl, 'muted');
 
         const text = await file.text();
-        const data = JSON.parse(text);
+        const data = isBookmarks ? parseBookmarksHtml(text) : JSON.parse(text);
+        if (isBookmarks && data.categories.length === 0) {
+            throw new Error('文件中没有找到 http/https 书签');
+        }
 
         const response = await api(endpoints.links.importData(), {
             method: 'POST',
-            body: JSON.stringify({ data, format })
+            // 书签转换为原生格式导入，分类默认私有
+            body: JSON.stringify({ data, format: isBookmarks ? 'native' : format })
         });
 
         if (!response.ok) {
@@ -1508,7 +1829,8 @@ function initDragAndDrop() {
             chosenClass: 'sortable-chosen',
             dragClass: 'sortable-drag',
             handle: '.link-item',
-            filter: '.edit-btn',
+            draggable: '.link-item:not(.link-add)',
+            filter: '.edit-btn, .delete-btn',
             preventOnFilter: false,
             onEnd: async function(evt) {
                 // 获取新的排序

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
 
 from app.config import GITHUB_URL
 from app.database import Base
@@ -20,5 +20,6 @@ class SiteSettings(Base):
     timezone = Column(String(64), nullable=False, default="Asia/Shanghai")
     github_url = Column(String(500), nullable=False, default=GITHUB_URL)
     protected_article_paths_json = Column(Text, nullable=False, default="[]")
+    private_mode = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

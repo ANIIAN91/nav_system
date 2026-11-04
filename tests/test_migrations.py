@@ -65,12 +65,13 @@ def test_alembic_upgrade_head_creates_core_schema_on_empty_db(tmp_path):
         }.issubset(table_names)
         assert "settings" not in table_names
         version = conn.execute("SELECT version_num FROM alembic_version").fetchone()
-        assert version == ("20260324_03",)
+        assert version == ("20261103_00",)
         site_settings_columns = {
             row[1]
             for row in conn.execute("PRAGMA table_info(site_settings)").fetchall()
         }
         assert "analytics_code" not in site_settings_columns
+        assert "private_mode" in site_settings_columns
 
 
 def test_alembic_upgrade_head_migrates_legacy_settings_table(tmp_path):
@@ -122,6 +123,8 @@ def test_alembic_upgrade_head_migrates_legacy_settings_table(tmp_path):
             for row in conn.execute("PRAGMA table_info(site_settings)").fetchall()
         }
         assert "analytics_code" not in site_settings_columns
+        private_mode = conn.execute("SELECT private_mode FROM site_settings WHERE id = 1").fetchone()
+        assert private_mode == (1,)
         legacy_table = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='settings'"
         ).fetchone()

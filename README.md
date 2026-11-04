@@ -30,12 +30,17 @@ Nav System 是一个基于 `FastAPI + Jinja2 + Vanilla JS + SQLite` 的个人导
 
 ## 特性
 
-- 分类导航、链接管理、拖拽排序、导入导出
+- 分类导航、链接管理、导入导出（原生 JSON、SunPanel、浏览器书签 HTML；同一分类中重复的网址自动跳过）
+- 私有模式（默认开启）：未登录访客看不到任何导航链接；新建分类默认“需要登录才可见”，只有公开分类显示“公开”标记
+- 快速添加：分类末尾的“添加链接”卡片只需粘贴网址，标题和图标由服务端自动获取
+- 书签小工具：“管理 → 添加链接”中的按钮拖到书签栏，浏览任意网页时一键收藏当前页
+- 编辑模式：右上角“编辑”后显示编辑/删除按钮并可拖拽排序，删除后可在提示中撤销；平时点击卡片只会打开链接
+- 搜索框回车打开第一个结果，导航中无匹配时用 Bing 搜索；`/` 或 Ctrl/⌘K 聚焦
 - Markdown 文章浏览、编辑、目录管理和同步
 - 目录级文章保护，受保护目录只对登录用户开放
 - 管理后台设置、访问日志、更新日志
-- JWT 登录、服务端登出撤销、登录限流
-- 自动 favicon 获取和本地图标缓存
+- HttpOnly Cookie 会话（可“保持登录”）、服务端登出撤销、登录限流；插件和脚本使用 Bearer Token
+- 自动 favicon 获取和本地图标缓存；图标文件名为基于 `SECRET_KEY` 的哈希，不暴露收藏的域名
 - Obsidian 插件同步与 Python 批量同步脚本
 - Docker 入口自动执行 Alembic 数据库迁移
 
@@ -102,6 +107,7 @@ ADMIN_PASSWORD=change_this_password
 | `MAX_VISIT_RECORDS` | `1000` | 访问日志保留数量 |
 | `MAX_UPDATE_RECORDS` | `500` | 更新日志保留数量 |
 | `SKIP_MIGRATIONS` | `false` | Docker 入口是否跳过 Alembic 迁移 |
+| `FAVICON_PUBLIC_FALLBACK` | `false` | 网站本身取不到图标时，是否使用 DuckDuckGo/Google 图标服务兜底（会把域名发给第三方） |
 
 ## 本地开发
 
@@ -164,6 +170,15 @@ docker run -d \
 
 挂载目录不变时，升级不会迁移或覆盖文章、数据库和图标缓存。新容器启动时会自动执行最新数据库迁移。
 
+从按域名保存图标的旧版本升级后，建议执行一次图标迁移，把 `github_com.png` 这类旧文件改为哈希文件名并更新数据库（先用 `--dry-run` 预览）：
+
+```bash
+docker exec nav-system python -m scripts.migrate_icon_names --dry-run
+docker exec nav-system python -m scripts.migrate_icon_names
+```
+
+脚本只处理被链接引用、且文件名与该链接域名对应的旧图标；手动指定的图标文件不受影响。哈希依赖 `SECRET_KEY`，请保持其固定不变。
+
 ## 数据与迁移
 
 数据库 schema 由 Alembic 管理。Docker 入口默认执行：
@@ -189,6 +204,7 @@ alembic upgrade head
 - `timezone`
 - `github_url`
 - `protected_article_paths_json`
+- `private_mode`（`20261103_00` 迁移新增，默认开启；可在“管理 → 站点设置”关闭）
 
 旧的 key-value `settings` 表、`app/models/setting.py` 和 `app/schemas/setting.py` 兼容层已移除。旧部署升级到当前版本时，需要执行 `alembic upgrade head`，让迁移链完成数据迁移和旧表删除。
 
@@ -240,7 +256,7 @@ obsidian-plugin/
 - 默认同步路径
 - 自动同步开关
 
-共享 API 契约在 `obsidian-plugin/api.js` 中维护。Token 可在首页管理弹窗的“导入导出”页签中复制。
+共享 API 契约在 `obsidian-plugin/api.js` 中维护。Token 在首页“管理 → 导入导出”页签点击“生成”获取（`POST /api/v1/auth/token`），有效期同 `ACCESS_TOKEN_EXPIRE_MINUTES`。
 
 ## API 约定
 
@@ -294,7 +310,7 @@ static/js/
 ├── core/                    # auth、endpoints
 ├── ui/                      # modal、theme、toast
 └── pages/
-    ├── home-20260425c.js       # 首页入口
+    ├── home-20261103.js       # 首页入口
     └── home/                # 文章浮页和文章管理模块
 ```
 
@@ -322,8 +338,10 @@ pytest
 - 生产环境建议放在 HTTPS 反向代理后
 - 不要提交真实 `.env`、数据库、个人文章、备份文件或图标缓存
 - 默认 `.gitignore` 已排除 `.env`、`data/`、`articles/`、`static/icons/` 和常见密钥文件
-- 前端只提供“记住用户名”，不保存密码
-- 登录保持依赖本地 token，有效期由 `ACCESS_TOKEN_EXPIRE_MINUTES` 控制，默认 30 天
+- 前端只提供“记住用户名”，不保存密码，也不在 `localStorage` 保存 Token
+- 浏览器登录态保存在 HttpOnly、SameSite=Lax 的 Cookie 中；勾选“保持登录”时有效期由 `ACCESS_TOKEN_EXPIRE_MINUTES` 控制（默认 30 天），否则关闭浏览器即失效
+- Cookie 会话发起的写请求必须带 `X-Nav-Request: 1` 请求头，用于防范跨站请求伪造
+- 私有模式默认开启，未登录访客拿不到任何导航链接
 
 ## 维护建议
 

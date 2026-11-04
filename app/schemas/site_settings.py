@@ -17,6 +17,8 @@ class PublicSiteSettingsBase(BaseModel):
     link_size: str = "medium"
     github_url: str = GITHUB_URL
     timezone: str = "Asia/Shanghai"
+    # 私有模式：未登录访客看不到任何导航链接
+    private_mode: bool = True
 
     @field_validator("link_size")
     @classmethod
@@ -41,6 +43,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     protected_article_paths: list[str] | None = None
     github_url: str | None = None
     timezone: str | None = None
+    private_mode: bool | None = None
 
     @field_validator("link_size")
     @classmethod

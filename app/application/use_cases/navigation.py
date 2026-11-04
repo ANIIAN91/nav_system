@@ -3,9 +3,12 @@
 import logging
 from datetime import datetime
 
+from urllib.parse import urlparse
+
 from app.application.errors import BadRequestError, NotFoundError
 from app.application.ports import UnitOfWork
-from app.core import validate_url
+from app.core import validate_safe_external_url, validate_url
+from app.utils.favicon import fetch_favicon
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +27,24 @@ class ListNavigationUseCase:
         self.uow = uow
 
     async def execute(self, include_private: bool) -> dict:
+        if not include_private:
+            site_settings = await self.uow.settings.get_settings()
+            if site_settings["private_mode"]:
+                return {"categories": []}
         return await self.uow.navigation.get_all_categories(include_auth_required=include_private)
+
+
+async def resolve_link_metadata(url: str) -> tuple[str, str | None]:
+    """Fetch page title and icon for quick add; fall back to the hostname."""
+    parsed = urlparse(url)
+    fallback_title = parsed.hostname or url
+    try:
+        safe_url = validate_safe_external_url(url)
+    except ValueError:
+        # mailto、内网地址等不抓取，标题退回为域名或原始地址
+        return fallback_title, None
+    result = await fetch_favicon(safe_url)
+    return result.get("title") or fallback_title, result.get("icon")
 
 
 class AddLinkUseCase:
@@ -34,16 +54,23 @@ class AddLinkUseCase:
     async def execute(
         self,
         category_name: str,
-        title: str,
+        title: str | None,
         url: str,
         icon: str | None,
         username: str,
+        fetch_icon: bool = False,
     ) -> dict:
         category_name = _normalize_category_name(category_name)
         try:
             validated_url = validate_url(url, allowed_schemes=("http", "https", "mailto"))
         except ValueError as exc:
             raise BadRequestError(str(exc)) from exc
+
+        title = (title or "").strip()
+        if not title or (fetch_icon and not icon):
+            fetched_title, fetched_icon = await resolve_link_metadata(validated_url)
+            title = title or fetched_title
+            icon = icon or fetched_icon
 
         result = await self.uow.navigation.add_link(category_name, title, validated_url, icon)
         await self.uow.logs.record_update("add", "link", title, f"分类: {category_name}, URL: {validated_url}", username)
@@ -172,14 +199,17 @@ class ImportNavigationUseCase:
             if "categories" not in import_data:
                 raise BadRequestError("缺少 categories 字段")
 
+            added_count = 0
+            duplicate_count = 0
             for category_data in import_data["categories"]:
                 category_name = _normalize_category_name(category_data["name"])
                 category = await self.uow.navigation.get_category_by_name(category_name)
                 if not category:
                     category = await self.uow.navigation.create_category(
                         category_name,
-                        category_data.get("auth_required", False),
+                        category_data.get("auth_required", True),
                     )
+                existing_urls = await self.uow.navigation.get_link_urls(category_name)
 
                 for link_data in category_data.get("links", []):
                     link_id = link_data.get("id")
@@ -202,6 +232,11 @@ class ImportNavigationUseCase:
                         logger.warning("Skipping invalid URL during import: %s - %s", link_data.get("url", ""), exc)
                         continue
 
+                    # 同一分类中已有相同网址时跳过，重复导入不会产生重复链接
+                    if validated_url in existing_urls:
+                        duplicate_count += 1
+                        continue
+
                     try:
                         await self.uow.navigation.add_link(
                             category_name,
@@ -210,6 +245,8 @@ class ImportNavigationUseCase:
                             link_data.get("icon"),
                             link_id,
                         )
+                        existing_urls.add(validated_url)
+                        added_count += 1
                     except Exception as exc:
                         logger.warning(
                             "Failed to add link during import: %s - %s",
@@ -219,7 +256,7 @@ class ImportNavigationUseCase:
                         continue
 
             await self.uow.commit()
-            return {"message": "导入成功"}
+            return {"message": f"导入成功：新增 {added_count} 个链接，跳过重复 {duplicate_count} 个"}
         except BadRequestError:
             raise
         except Exception as exc:

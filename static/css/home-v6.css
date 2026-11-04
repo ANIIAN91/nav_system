@@ -3,6 +3,7 @@ body.home-v6 {
     --home-surface: #101010;
     --home-surface-alt: #151515;
     --home-card: #151515;
+    --home-icon-surface: #c8c3b9;
     --home-border: #232323;
     --home-border-strong: #313131;
     --home-text: #d7d2c6;
@@ -31,6 +32,7 @@ html[data-theme="light"] body.home-v6 {
     --home-surface: #f7f2e8;
     --home-surface-alt: #fbf8f1;
     --home-card: #f4efe5;
+    --home-icon-surface: #e7e0d4;
     --home-border: #d8cfbe;
     --home-border-strong: #c8b99e;
     --home-text: #2c261f;
@@ -708,27 +710,29 @@ body.home-v6 .link-item:hover {
 }
 
 body.home-v6 .link-icon {
-    width: 34px;
-    height: 34px;
+    --link-icon-image-size: 26px;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
     margin: 0;
     border-radius: 9px;
-    flex: 0 0 34px;
+    flex: 0 0 36px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--home-border);
     color: var(--home-accent);
     box-shadow: none;
 }
 
-/* 图片图标使用浅色衬底 + contain，深色/透明图标（GitHub、Notion）在暗色主题下也清晰 */
+/* 柔和衬底随主题调整，保留深色透明图标的对比度。 */
 body.home-v6 .link-icon:has(img) {
-    background: #ece7dc;
+    background: var(--home-icon-surface);
     border-color: transparent;
 }
 
 body.home-v6 .link-icon img {
-    width: 78%;
-    height: 78%;
-    border-radius: 6px;
+    width: var(--link-icon-image-size);
+    height: var(--link-icon-image-size);
     object-fit: contain;
 }
 
@@ -738,6 +742,7 @@ body.home-v6 .links-grid.size-small .link-item {
 }
 
 body.home-v6 .links-grid.size-small .link-icon {
+    --link-icon-image-size: 24px;
     width: 32px;
     height: 32px;
     flex-basis: 32px;
@@ -758,6 +763,7 @@ body.home-v6 .links-grid.size-large .link-item {
 }
 
 body.home-v6 .links-grid.size-large .link-icon {
+    --link-icon-image-size: 32px;
     width: 44px;
     height: 44px;
     flex-basis: 44px;

@@ -100,3 +100,7 @@ nosetests.xml
 
 # Alembic
 alembic/versions/*.pyc
+
+# Local review artifacts and agent workspaces
+assets/ui-review/
+.work/

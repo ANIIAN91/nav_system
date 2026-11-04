@@ -22,6 +22,8 @@ import { showToast } from "../ui/toast.js?v=20261103";
 
 // 搜索无匹配时回车使用的搜索引擎
 const SEARCH_ENGINE_URL = "https://www.bing.com/search?q=";
+// 分类栏中“全部”选项：平铺显示所有可见分类
+const ALL_CATEGORIES = "__all__";
 
 const state = {
     authenticated: false,
@@ -108,6 +110,9 @@ function getRenderableCategories() {
             .filter((category) => category.links.length > 0);
     }
 
+    if (state.currentCategory === ALL_CATEGORIES) {
+        return visibleCategories;
+    }
     return visibleCategories.filter((cat) => cat.name === state.currentCategory);
 }
 
@@ -150,6 +155,28 @@ function setHomeView(view) {
     document.querySelectorAll("[data-home-view]").forEach((tab) => {
         tab.classList.toggle("active", tab.dataset.homeView === state.currentView);
     });
+    updateSearchCrossHint();
+}
+
+// 搜索时提示另一个视图中的匹配数量，点击切换过去
+function updateSearchCrossHint() {
+    const hint = document.getElementById("search-cross-hint");
+    if (!hint) return;
+    const searchTerm = getSearchTerm();
+    let count = 0;
+    if (searchTerm && state.currentView === "navigation") {
+        count = getFilteredArticles().length;
+        hint.textContent = `笔记中有 ${count} 篇匹配 · 查看 →`;
+        hint.dataset.targetView = "articles";
+    } else if (searchTerm) {
+        count = getVisibleCategories().reduce(
+            (total, category) => total + category.links.filter((link) => linkMatchesSearch(link, category.name, searchTerm)).length,
+            0,
+        );
+        hint.textContent = `导航中有 ${count} 个匹配链接 · 查看 →`;
+        hint.dataset.targetView = "navigation";
+    }
+    hint.hidden = count === 0;
 }
 
 async function api(url, options = {}) {
@@ -197,7 +224,6 @@ function updateClock() {
             timeZone: timezone,
             hour: '2-digit',
             minute: '2-digit',
-            second: '2-digit',
             hour12: false
         });
         clock.textContent = formatter.format(now);
@@ -206,8 +232,7 @@ function updateClock() {
         const now = new Date();
         const hours = String(now.getHours()).padStart(2, '0');
         const minutes = String(now.getMinutes()).padStart(2, '0');
-        const seconds = String(now.getSeconds()).padStart(2, '0');
-        clock.textContent = `${hours}:${minutes}:${seconds}`;
+        clock.textContent = `${hours}:${minutes}`;
     }
 }
 
@@ -258,6 +283,11 @@ async function loadArticles(options = {}) {
         const response = await api(endpoints.articles.list(), options);
         const data = await response.json();
         state.articles = data.articles || [];
+        const articlesCount = document.getElementById("articles-count");
+        if (articlesCount) {
+            articlesCount.textContent = String(state.articles.length);
+            articlesCount.hidden = state.articles.length === 0;
+        }
         renderArticleCards();
         await maybeOpenArticleFromLocation(state.articles);
     } catch (error) {
@@ -309,11 +339,21 @@ function renderCategoryNav() {
         return;
     }
 
-    // 如果当前分类不可见，选择第一个可见分类
-    const currentCategoryVisible = visibleCategories.some(cat => cat.name === state.currentCategory);
+    // 如果当前分类不可见，选择第一个可见分类（“全部”始终可见）
+    const currentCategoryVisible = state.currentCategory === ALL_CATEGORIES
+        || visibleCategories.some(cat => cat.name === state.currentCategory);
     if (!currentCategoryVisible && visibleCategories.length > 0) {
         state.currentCategory = visibleCategories[0].name;
     }
+
+    const allBtn = document.createElement('button');
+    allBtn.className = 'category-nav-item is-all';
+    allBtn.dataset.category = ALL_CATEGORIES;
+    allBtn.textContent = '全部';
+    if (state.currentCategory === ALL_CATEGORIES) {
+        allBtn.classList.add('active');
+    }
+    navContainer.appendChild(allBtn);
 
     // 添加各分类按钮
     visibleCategories.forEach((category) => {
@@ -334,8 +374,8 @@ function renderCategoryNav() {
             btn.appendChild(badge);
         }
 
-        // 添加编辑按钮（仅编辑模式且为当前分类）
-        if (state.editMode && state.currentCategory === category.name) {
+        // 编辑模式下每个分类都可直接编辑
+        if (state.editMode) {
             const editBtn = document.createElement('button');
             editBtn.className = 'category-edit-icon';
             editBtn.innerHTML = '&#9998;';
@@ -362,6 +402,15 @@ function renderCategoryNav() {
                 return;
             }
             state.currentCategory = btn.dataset.category;
+            // 搜索中点分类：退出搜索并切到该分类
+            if (getSearchTerm()) {
+                const searchInput = document.getElementById('home-search-input');
+                if (searchInput) searchInput.value = '';
+                state.searchTerm = '';
+                document.body.classList.remove('is-searching');
+                renderArticleCards();
+                updateSearchCrossHint();
+            }
             renderCategoryNav();
             renderLinks();
         });
@@ -395,10 +444,14 @@ function renderArticleCards() {
         return;
     }
 
-    filteredArticles.forEach((article) => {
+    const articleSearchTerm = getSearchTerm();
+    filteredArticles.forEach((article, index) => {
         const card = document.createElement("button");
         card.type = "button";
         card.className = "article-card";
+        if (articleSearchTerm && index === 0) {
+            card.classList.add("is-first-match");
+        }
         card.addEventListener("click", () => {
             openArticleSheet(article);
         });
@@ -446,11 +499,9 @@ function renderLinks() {
         const categoryEl = document.createElement('div');
         categoryEl.className = 'category';
 
-        if (searchTerm) {
-            const label = document.createElement("div");
-            label.className = "category-search-label";
-            label.textContent = category.name;
-            categoryEl.appendChild(label);
+        // 平铺或搜索时显示分类标题行
+        if (searchTerm || categoriesToShow.length > 1 || state.currentCategory === ALL_CATEGORIES) {
+            categoryEl.appendChild(createCategoryHeader(category));
         }
 
         const linksGrid = document.createElement('div');
@@ -463,6 +514,10 @@ function renderLinks() {
             linkEl.rel = 'noopener noreferrer';
             linkEl.className = 'link-item';
             linkEl.dataset.id = link.id || '';
+            // 搜索时标出回车会打开的那一项，与 openFirstSearchResult 选中的是同一项：第一个分类的第一个链接
+            if (searchTerm && categoriesToShow[0] === category && category.links[0] === link) {
+                linkEl.classList.add('is-first-match');
+            }
             linkEl.addEventListener('click', (e) => {
                 // 编辑模式下点击卡片不跳转，避免拖拽时误打开
                 if (state.editMode) e.preventDefault();
@@ -730,6 +785,30 @@ function createLinksEmptyState(searchTerm) {
     return emptyEl;
 }
 
+// 平铺/搜索时的分类标题行：名称、公开标记、链接数
+function createCategoryHeader(category) {
+    const header = document.createElement('div');
+    header.className = 'category-header';
+
+    const name = document.createElement('span');
+    name.className = 'category-header-name';
+    name.textContent = category.name;
+    header.appendChild(name);
+
+    if (!category.auth_required) {
+        const badge = document.createElement('span');
+        badge.className = 'auth-badge';
+        badge.textContent = '公开';
+        header.appendChild(badge);
+    }
+
+    const count = document.createElement('span');
+    count.className = 'category-header-count';
+    count.textContent = String(category.links.length);
+    header.appendChild(count);
+    return header;
+}
+
 // 分类末尾的“快速添加”卡片
 function createQuickAddElement(categoryName) {
     const addEl = document.createElement('button');
@@ -791,7 +870,9 @@ async function quickAddLink(category, url, title) {
         }
         const data = await response.json();
         closeModal('quick-add-modal');
-        state.currentCategory = category;
+        if (state.currentCategory !== ALL_CATEGORIES) {
+            state.currentCategory = category;
+        }
         await loadLinks();
         showToast(`已添加「${data.link.title}」`, 'success');
         // 由书签小工具打开的小窗口，添加完成后自动关闭
@@ -1140,7 +1221,9 @@ async function updateCategory(oldName, newName, authRequired) {
         await loadLinks();
 
         // 自动切换到修改后的分类
-        state.currentCategory = newName;
+        if (state.currentCategory !== ALL_CATEGORIES) {
+            state.currentCategory = newName;
+        }
         renderCategoryNav();
         renderLinks();
 
@@ -1319,6 +1402,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    document.getElementById('search-cross-hint')?.addEventListener('click', (event) => {
+        setHomeView(event.currentTarget.dataset.targetView);
+    });
+
     // 编辑模式按钮
     document.getElementById('edit-mode-btn')?.addEventListener('click', () => {
         setEditMode(!state.editMode);
@@ -1336,8 +1423,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (searchInput) {
         searchInput.addEventListener("input", (event) => {
             state.searchTerm = event.target.value || "";
+            document.body.classList.toggle("is-searching", Boolean(getSearchTerm()));
             renderArticleCards();
             renderLinks();
+            updateSearchCrossHint();
         });
         searchInput.addEventListener("keydown", (event) => {
             if (event.key === "Enter") {
@@ -1346,8 +1435,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else if (event.key === "Escape") {
                 searchInput.value = "";
                 state.searchTerm = "";
+                document.body.classList.remove("is-searching");
                 renderArticleCards();
                 renderLinks();
+                updateSearchCrossHint();
                 searchInput.blur();
             }
         });
@@ -1799,13 +1890,14 @@ function initCategoryNavDragAndDrop() {
             chosenClass: 'sortable-chosen',
             dragClass: 'sortable-drag',
             handle: '.category-nav-item',
+            draggable: '.category-nav-item:not(.is-all)',
             filter: '.category-edit-icon',
             preventOnFilter: false,
             onEnd: async function(evt) {
                 // 获取新的分类排序
                 const categoryNames = Array.from(evt.to.children)
                     .map(el => el.dataset.category)
-                    .filter(name => name);
+                    .filter(name => name && name !== ALL_CATEGORIES);
 
                 // 调用批量排序 API
                 await batchReorderCategories(categoryNames);
